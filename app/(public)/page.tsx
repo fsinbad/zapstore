@@ -4,66 +4,21 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ArrowRight, Search, Zap, Store, ShieldCheck, Download, Sparkles } from 'lucide-react'
 import { heroTextVariants, fadeIn } from '@/lib/constants/animation'
 import { cn } from '@/lib/utils'
-
-const categories = ['All', 'Templates', 'Code', 'Design', 'Writing', 'Video', 'Music', 'Other']
-
-// Mock featured products
-const featuredProducts = [
-  { id: '1', slug: 'nextjs-saas-template', title: 'Next.js SaaS Starter Kit', shortDescription: 'Production-ready SaaS template with auth, billing, and dashboard', price: 49.00, category: 'Templates', creator: { username: 'devpro', avatar: 'DP' }, coverImage: null },
-  { id: '2', slug: 'icon-pack-3d', title: '3D Icon Pack — 200+ Icons', shortDescription: 'Beautiful 3D rendered icons for web and mobile apps', price: 29.00, category: 'Design', creator: { username: 'designlab', avatar: 'DL' }, coverImage: null },
-  { id: '3', slug: 'python-ml-course', title: 'Python ML Masterclass', shortDescription: 'Complete machine learning course with real-world projects', price: 79.00, category: 'Video', creator: { username: 'aiteacher', avatar: 'AT' }, coverImage: null },
-  { id: '4', slug: 'tailwind-components', title: 'Tailwind Component Library', shortDescription: '150+ responsive components built with Tailwind CSS', price: 39.00, category: 'Code', creator: { username: 'uicraft', avatar: 'UC' }, coverImage: null },
-  { id: '5', slug: 'copywriting-guide', title: 'The Copywriting Playbook', shortDescription: 'Write copy that converts — templates and frameworks included', price: 19.00, category: 'Writing', creator: { username: 'wordsmith', avatar: 'WS' }, coverImage: null },
-  { id: '6', slug: 'lofi-beats-pack', title: 'Lo-Fi Beats Sample Pack', shortDescription: '50 royalty-free lo-fi beats for content creators', price: 24.00, category: 'Music', creator: { username: 'beatmaker', avatar: 'BM' }, coverImage: null },
-]
-
-function ProductCard({ product }: { product: typeof featuredProducts[0] }) {
-  return (
-    <Link href={`/products/${product.slug}`}>
-      <Card className="group border-border/50 bg-card hover:shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-        {/* Cover Image */}
-        <div className="aspect-video bg-muted/30 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-secondary/10 to-zap-cyan/10" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Sparkles className="w-8 h-8 text-muted-foreground/30" />
-          </div>
-          {/* Hover overlay */}
-          <div className="absolute inset-0 bg-primary/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Button variant="secondary" size="sm" className="font-bold">View Product</Button>
-          </div>
-        </div>
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Avatar className="h-5 w-5">
-              <AvatarFallback className="text-[8px] bg-primary/10 text-primary font-bold">{product.creator.avatar}</AvatarFallback>
-            </Avatar>
-            <span className="text-xs text-muted-foreground">{product.creator.username}</span>
-          </div>
-          <h3 className="font-heading font-bold text-sm leading-tight line-clamp-2">{product.title}</h3>
-          <p className="text-xs text-muted-foreground line-clamp-1">{product.shortDescription}</p>
-          <div className="flex items-center justify-between pt-1">
-            <Badge variant="outline" className="text-[10px]">{product.category}</Badge>
-            <span className="font-bold text-sm tabular-nums">${product.price.toFixed(2)} <span className="text-muted-foreground text-xs font-normal">USDC</span></span>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  )
-}
+import { FEATURED_PRODUCTS } from '@/lib/mock-data'
+import { CATEGORY_FILTERS } from '@/lib/constants/categories'
+import { ROUTES } from '@/lib/constants/routes'
+import { ProductCard } from '@/components/shared/ProductCard'
 
 export default function MarketplacePage() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const filteredProducts = featuredProducts.filter((p) => {
+  const filteredProducts = FEATURED_PRODUCTS.filter((p) => {
     const matchesCategory = activeCategory === 'All' || p.category === activeCategory
     const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesCategory && matchesSearch
@@ -105,12 +60,12 @@ export default function MarketplacePage() {
           </motion.div>
 
           <motion.div custom={3} initial="hidden" animate="visible" variants={heroTextVariants} className="flex items-center justify-center gap-4 mt-8">
-            <Link href="/dashboard/products/new">
+            <Link href={ROUTES.DASHBOARD_PRODUCTS_NEW}>
               <Button size="lg" className="h-12 px-8 rounded-full font-semibold group transition-all hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(92,92,255,0.3)]">
                 Start Selling <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
-            <Link href="/products">
+            <Link href={ROUTES.PRODUCTS}>
               <Button size="lg" variant="outline" className="h-12 px-8 rounded-full border-border/40 hover:bg-muted/50">
                 Browse All
               </Button>
@@ -155,7 +110,7 @@ export default function MarketplacePage() {
       {/* Category Pills */}
       <section className="container mx-auto px-4 pb-6">
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          {categories.map((cat) => (
+          {CATEGORY_FILTERS.map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
@@ -178,7 +133,7 @@ export default function MarketplacePage() {
           <h2 className="font-heading text-xl font-bold">
             {activeCategory === 'All' ? 'Featured Products' : activeCategory}
           </h2>
-          <Link href="/products" className="text-sm text-primary hover:underline">
+          <Link href={ROUTES.PRODUCTS} className="text-sm text-primary hover:underline">
             View all
           </Link>
         </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Twitter, Github, Zap } from 'lucide-react'
+import { Globe, Code2, Zap } from 'lucide-react'
 
 const footerLinks = {
   marketplace: [
@@ -46,10 +46,10 @@ export default function PublicFooter() {
             </p>
             <div className="flex items-center gap-4">
               <a href="#" className="w-10 h-10 rounded-full glass-card flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 transition-all duration-300">
-                <Twitter className="w-4 h-4" />
+                <Globe className="w-4 h-4" />
               </a>
               <a href="#" className="w-10 h-10 rounded-full glass-card flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 transition-all duration-300">
-                <Github className="w-4 h-4" />
+                <Code2 className="w-4 h-4" />
               </a>
             </div>
           </div>
