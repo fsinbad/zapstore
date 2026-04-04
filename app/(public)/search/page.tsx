@@ -2,27 +2,20 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { Search, Sparkles } from 'lucide-react'
-
-const allProducts = [
-  { id: '1', slug: 'nextjs-saas-template', title: 'Next.js SaaS Starter Kit', shortDescription: 'Production-ready SaaS template', price: 49.00, category: 'Templates', creator: { username: 'devpro', avatar: 'DP' } },
-  { id: '2', slug: 'icon-pack-3d', title: '3D Icon Pack — 200+ Icons', shortDescription: 'Beautiful 3D rendered icons', price: 29.00, category: 'Design', creator: { username: 'designlab', avatar: 'DL' } },
-  { id: '3', slug: 'python-ml-course', title: 'Python ML Masterclass', shortDescription: 'Complete ML course', price: 79.00, category: 'Video', creator: { username: 'aiteacher', avatar: 'AT' } },
-  { id: '4', slug: 'tailwind-components', title: 'Tailwind Component Library', shortDescription: '150+ responsive components', price: 39.00, category: 'Code', creator: { username: 'uicraft', avatar: 'UC' } },
-  { id: '5', slug: 'copywriting-guide', title: 'The Copywriting Playbook', shortDescription: 'Copy that converts', price: 19.00, category: 'Writing', creator: { username: 'wordsmith', avatar: 'WS' } },
-  { id: '6', slug: 'lofi-beats-pack', title: 'Lo-Fi Beats Sample Pack', shortDescription: 'Royalty-free lo-fi beats', price: 24.00, category: 'Music', creator: { username: 'beatmaker', avatar: 'BM' } },
-]
+import { MOCK_PRODUCTS } from '@/lib/mock-data'
+import { ROUTES } from '@/lib/constants/routes'
+import { PriceDisplay } from '@/components/shared/PriceDisplay'
 
 export default function SearchPage() {
   const [query, setQuery] = useState('')
 
   const results = query.length > 0
-    ? allProducts.filter((p) =>
+    ? MOCK_PRODUCTS.filter((p) =>
         p.title.toLowerCase().includes(query.toLowerCase()) ||
         p.shortDescription.toLowerCase().includes(query.toLowerCase()) ||
         p.category.toLowerCase().includes(query.toLowerCase())
@@ -66,7 +59,7 @@ export default function SearchPage() {
             <p className="text-sm text-muted-foreground mb-6">{results.length} result{results.length !== 1 ? 's' : ''} for &ldquo;{query}&rdquo;</p>
             <div className="space-y-4">
               {results.map((product) => (
-                <Link key={product.id} href={`/products/${product.slug}`}>
+                <Link key={product.id} href={ROUTES.PRODUCT(product.slug)}>
                   <Card className="border-border/50 bg-card hover:bg-muted/30 transition-colors">
                     <CardContent className="p-4 flex items-center gap-4">
                       <div className="w-16 h-12 rounded-lg bg-muted/30 flex items-center justify-center flex-shrink-0">
@@ -82,7 +75,7 @@ export default function SearchPage() {
                           <Badge variant="outline" className="text-[9px]">{product.category}</Badge>
                         </div>
                       </div>
-                      <span className="font-bold text-sm tabular-nums whitespace-nowrap">${product.price.toFixed(2)} <span className="text-muted-foreground text-xs font-normal">USDC</span></span>
+                      <PriceDisplay amount={product.price} className="font-bold text-sm whitespace-nowrap" suffixSize="xs" />
                     </CardContent>
                   </Card>
                 </Link>

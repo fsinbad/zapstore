@@ -8,40 +8,20 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { ShieldCheck, Zap, Clock, FileText, ArrowLeft, Sparkles, Heart } from 'lucide-react'
-
-// Mock product data — in production fetched by slug via API
-const mockProduct = {
-  id: '1',
-  slug: 'nextjs-saas-template',
-  title: 'Next.js SaaS Starter Kit',
-  shortDescription: 'Production-ready SaaS template with auth, billing, and dashboard',
-  descriptionMd: `## What's included\n\n- **Authentication** — Email/password, OAuth, magic links\n- **Billing** — Stripe integration with subscription management\n- **Dashboard** — Admin panel with analytics\n- **Landing Page** — Conversion-optimized marketing page\n- **Email Templates** — Transactional emails via Resend\n\n## Tech Stack\n\nNext.js 14, TypeScript, Tailwind CSS, Prisma, PostgreSQL, Stripe\n\n## Who is this for?\n\nDevelopers who want to ship their SaaS product fast without building boilerplate from scratch.`,
-  price: 49.00,
-  category: 'Templates',
-  tags: ['nextjs', 'saas', 'typescript', 'tailwind'],
-  fileName: 'nextjs-saas-starter-v2.zip',
-  fileSize: '12.4 MB',
-  fileMimeType: 'application/zip',
-  creator: {
-    username: 'devpro',
-    displayName: 'DevPro Studio',
-    avatar: 'DP',
-    bio: 'Building production-ready developer tools',
-    productCount: 8,
-  },
-  previewImages: [],
-  salesCount: 342,
-}
+import { MOCK_PRODUCT_DETAIL } from '@/lib/mock-data'
+import { ROUTES } from '@/lib/constants/routes'
+import { PriceDisplay } from '@/components/shared/PriceDisplay'
+import type { Product } from '@/types'
 
 export default function ProductPage() {
   const [purchasing, setPurchasing] = useState(false)
-  const product = mockProduct
+  const product: Product = MOCK_PRODUCT_DETAIL
 
   return (
     <div className="min-h-screen pt-28 pb-16">
       <div className="container mx-auto px-4">
         {/* Back */}
-        <Link href="/products" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+        <Link href={ROUTES.PRODUCTS} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4" />
           Back to products
         </Link>
@@ -129,9 +109,7 @@ export default function ProductPage() {
               <Card className="border-border/50 bg-card">
                 <CardContent className="p-6 space-y-6">
                   {/* Price */}
-                  <div className="text-3xl font-bold tabular-nums">
-                    ${product.price.toFixed(2)} <span className="text-lg text-muted-foreground font-normal">USDC</span>
-                  </div>
+                  <PriceDisplay amount={product.price} className="text-3xl font-bold" suffixSize="base" />
 
                   {/* File badge */}
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -154,7 +132,7 @@ export default function ProductPage() {
                         Completing purchase...
                       </span>
                     ) : (
-                      <>Buy Now &mdash; ${product.price.toFixed(2)} USDC</>
+                      <>Buy Now &mdash; <PriceDisplay amount={product.price} /></>
                     )}
                   </Button>
 
@@ -182,7 +160,7 @@ export default function ProductPage() {
                       <AvatarFallback className="bg-primary/10 text-primary font-bold">{product.creator.avatar}</AvatarFallback>
                     </Avatar>
                     <div>
-                      <Link href={`/store/${product.creator.username}`} className="font-heading font-bold text-sm hover:text-primary transition-colors">
+                      <Link href={ROUTES.STORE(product.creator.username)} className="font-heading font-bold text-sm hover:text-primary transition-colors">
                         {product.creator.displayName}
                       </Link>
                       <p className="text-xs text-muted-foreground">{product.creator.productCount} products</p>
@@ -191,7 +169,7 @@ export default function ProductPage() {
                   <p className="text-sm text-muted-foreground">{product.creator.bio}</p>
                   <div className="flex gap-2 mt-4">
                     <Button variant="outline" size="sm" className="flex-1 rounded-lg" asChild>
-                      <Link href={`/store/${product.creator.username}`}>View Store</Link>
+                      <Link href={ROUTES.STORE(product.creator.username)}>View Store</Link>
                     </Button>
                     <Button variant="ghost" size="icon" className="rounded-lg">
                       <Heart className="w-4 h-4" />
