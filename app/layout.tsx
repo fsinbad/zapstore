@@ -4,6 +4,7 @@ import { Outfit, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import ReactQueryProvider from "@/components/providers/ReactQueryProvider"
+import PrivyProvider from "@/components/providers/PrivyProvider"
 import { Toaster } from "@/components/ui/sonner"
 
 const fontHeading = Outfit({
@@ -84,10 +85,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ReactQueryProvider>
-            {children}
-            <Toaster richColors closeButton position="bottom-right" />
-          </ReactQueryProvider>
+          <PrivyProvider>
+            <ReactQueryProvider>
+              {children}
+              <Toaster richColors closeButton position="bottom-right" />
+            </ReactQueryProvider>
+          </PrivyProvider>
         </ThemeProvider>
       </body>
     </html>

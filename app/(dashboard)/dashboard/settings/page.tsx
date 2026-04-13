@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,12 +8,62 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Store, Mail, Save, ShieldCheck, Copy, Share2, Upload, ExternalLink, LogOut } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Store, Mail, Save, ShieldCheck, Copy, Share2, Upload, ExternalLink, LogOut, Loader2 } from 'lucide-react'
 import { ROUTES } from '@/lib/constants/routes'
+import { useUpdateProfile } from '@/lib/api/users'
+import { useUploadImage } from '@/lib/api/products'
+import { useWallet } from '@/hooks/useWallet'
+import { toast } from 'sonner'
 
 export default function SettingsPage() {
-  const storeUrl = `https://zapstore.xyz${ROUTES.STORE('devpro')}`
+  const { wallet, logout } = useWallet()
+  const updateProfile = useUpdateProfile()
+  const uploadImage = useUploadImage()
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  const [displayName, setDisplayName] = useState('DevPro Studio')
+  const [username, setUsername] = useState('devpro')
+  const [bio, setBio] = useState('Building production-ready developer tools and SaaS templates.')
+  const [email, setEmail] = useState('creator@zapstore.xyz')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+
+  const walletAddress = wallet?.address ?? ''
+  const storeUrl = `https://zapstore.xyz${ROUTES.STORE(username)}`
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const result = await uploadImage.mutateAsync(file)
+      setAvatarUrl(result.url)
+      toast.success('Avatar uploaded')
+    } catch {
+      toast.error('Failed to upload avatar')
+    }
+  }
+
+  const handleSave = async () => {
+    try {
+      await updateProfile.mutateAsync({
+        displayName,
+        username,
+        bio,
+        avatarUrl: avatarUrl ?? undefined,
+      })
+      toast.success('Settings saved!')
+    } catch {
+      toast.error('Failed to save settings')
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch {
+      toast.error('Failed to log out')
+    }
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-16 lg:pb-0">
@@ -36,11 +87,20 @@ export default function SettingsPage() {
               {/* Avatar upload */}
               <div className="flex items-center gap-6">
                 <Avatar className="h-20 w-20">
-                  <AvatarFallback className="text-2xl bg-primary/10 text-primary font-bold">DP</AvatarFallback>
+                  {avatarUrl && <AvatarImage src={avatarUrl} />}
+                  <AvatarFallback className="text-2xl bg-primary/10 text-primary font-bold">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="space-y-2">
-                  <Button variant="outline" size="sm" className="gap-2 rounded-xl">
-                    <Upload className="w-4 h-4" /> Upload Avatar
+                  <input type="file" ref={avatarInputRef} className="hidden" accept="image/jpeg,image/png" onChange={handleAvatarUpload} />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 rounded-xl"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={uploadImage.isPending}
+                  >
+                    {uploadImage.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    Upload Avatar
                   </Button>
                   <p className="text-xs text-muted-foreground">JPEG or PNG, max 2MB</p>
                 </div>
@@ -49,13 +109,13 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1">Display Name</Label>
-                  <Input defaultValue="DevPro Studio" className="h-12 rounded-xl bg-muted/20 border-transparent focus:bg-background transition-all" />
+                  <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="h-12 rounded-xl bg-muted/20 border-transparent focus:bg-background transition-all" />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1">Store URL Slug</Label>
                   <div className="flex gap-2">
                     <Badge variant="outline" className="h-12 px-3 rounded-xl border-border/50 bg-muted/50 text-muted-foreground font-mono">/store/</Badge>
-                    <Input defaultValue="devpro" className="h-12 rounded-xl bg-muted/20 border-transparent focus:bg-background transition-all flex-1" />
+                    <Input value={username} onChange={(e) => setUsername(e.target.value)} className="h-12 rounded-xl bg-muted/20 border-transparent focus:bg-background transition-all flex-1" />
                   </div>
                 </div>
               </div>
@@ -63,7 +123,8 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1">Bio</Label>
                 <Textarea
-                  defaultValue="Building production-ready developer tools and SaaS templates."
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
                   className="min-h-[120px] rounded-xl bg-muted/20 border-transparent focus:bg-background transition-all resize-none"
                   maxLength={500}
                 />
@@ -74,14 +135,19 @@ export default function SettingsPage() {
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1">Notification Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                  <Input defaultValue="creator@zapstore.xyz" className="h-12 pl-12 rounded-xl bg-muted/20 border-transparent focus:bg-background transition-all" />
+                  <Input value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 pl-12 rounded-xl bg-muted/20 border-transparent focus:bg-background transition-all" />
                 </div>
                 <p className="text-xs text-muted-foreground">We&apos;ll send sale notifications to this address</p>
               </div>
 
               <div className="flex justify-end pt-4">
-                <Button className="rounded-xl font-bold py-6 px-8 gap-2 shadow-lg shadow-primary/20">
-                  <Save size={18} /> Save Changes
+                <Button
+                  className="rounded-xl font-bold py-6 px-8 gap-2 shadow-lg shadow-primary/20"
+                  onClick={handleSave}
+                  disabled={updateProfile.isPending}
+                >
+                  {updateProfile.isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                  Save Changes
                 </Button>
               </div>
             </CardContent>
@@ -97,14 +163,14 @@ export default function SettingsPage() {
                 </CardTitle>
                 <CardDescription>Your Privy-managed Starknet wallet.</CardDescription>
               </div>
-              <Badge className="bg-green-500/10 text-green-500 border-green-500/20 rounded-lg">Connected</Badge>
+              <Badge className="bg-green-500/10 text-green-500 border-green-500/20 rounded-lg">{walletAddress ? 'Connected' : 'Not Connected'}</Badge>
             </CardHeader>
             <CardContent>
               <div className="p-4 rounded-2xl bg-muted/20 border border-border/50 space-y-3">
                 <p className="text-sm font-bold">Starknet Wallet Address</p>
                 <div className="flex gap-2">
-                  <code className="flex-1 p-3 rounded-xl bg-background border border-border/50 text-sm font-mono truncate">0x0742d35Cc6634C0532925a3b844Bc9e7595f2bD3</code>
-                  <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl border-border/50 bg-card shrink-0">
+                  <code className="flex-1 p-3 rounded-xl bg-background border border-border/50 text-sm font-mono truncate">{walletAddress || 'Loading...'}</code>
+                  <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl border-border/50 bg-card shrink-0" onClick={() => { navigator.clipboard.writeText(walletAddress); toast.success('Address copied') }}>
                     <Copy size={16} />
                   </Button>
                 </div>
@@ -120,7 +186,8 @@ export default function SettingsPage() {
           <Card className="border-border/50 bg-card overflow-hidden text-center">
             <div className="bg-primary/5 p-8 border-b border-border/50 flex flex-col items-center">
               <Avatar className="h-20 w-20 mb-4">
-                <AvatarFallback className="text-2xl bg-primary/10 text-primary font-bold">DP</AvatarFallback>
+                {avatarUrl && <AvatarImage src={avatarUrl} />}
+                <AvatarFallback className="text-2xl bg-primary/10 text-primary font-bold">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
               </Avatar>
               <h3 className="text-xl font-bold font-heading">Your Store</h3>
               <p className="text-xs text-muted-foreground pt-1">Share your store link with buyers</p>
@@ -131,10 +198,10 @@ export default function SettingsPage() {
                 <p className="text-sm font-bold text-primary truncate">{storeUrl}</p>
               </div>
               <div className="flex gap-3 pt-2">
-                <Button variant="outline" className="flex-1 rounded-xl font-bold gap-2">
+                <Button variant="outline" className="flex-1 rounded-xl font-bold gap-2" onClick={() => { navigator.clipboard.writeText(storeUrl); toast.success('Link copied') }}>
                   <Copy size={16} /> Copy
                 </Button>
-                <Button className="flex-1 rounded-xl font-bold gap-2">
+                <Button className="flex-1 rounded-xl font-bold gap-2" onClick={() => { if (navigator.share) navigator.share({ url: storeUrl }) }}>
                   <Share2 size={16} /> Share
                 </Button>
               </div>
@@ -154,7 +221,7 @@ export default function SettingsPage() {
                   <h3 className="font-bold">Sign Out</h3>
                   <p className="text-xs text-muted-foreground">Log out of your ZapStore account.</p>
                 </div>
-                <Button variant="destructive" className="w-full rounded-xl font-bold gap-2">
+                <Button variant="destructive" className="w-full rounded-xl font-bold gap-2" onClick={handleLogout}>
                   <LogOut size={16} /> Log Out
                 </Button>
               </div>

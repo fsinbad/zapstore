@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Sparkles } from 'lucide-react'
 import { PriceDisplay } from '@/components/shared/PriceDisplay'
@@ -18,10 +18,20 @@ export function ProductCard({ product }: ProductCardProps) {
       <Card className="group border-border/50 bg-card hover:shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden h-full">
         {/* Cover Image */}
         <div className="aspect-video bg-muted/30 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-secondary/10 to-zap-cyan/10" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Sparkles className="w-8 h-8 text-muted-foreground/30" />
-          </div>
+          {product.coverImageUrl ? (
+            <img
+              src={product.coverImageUrl}
+              alt={product.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-secondary/10 to-zap-cyan/10" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Sparkles className="w-8 h-8 text-muted-foreground/30" />
+              </div>
+            </>
+          )}
           <div className="absolute inset-0 bg-primary/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
             <Button variant="secondary" size="sm" className="font-bold">
               View Product
@@ -32,6 +42,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Avatar className="h-5 w-5">
+              {product.creator.avatarUrl && <AvatarImage src={product.creator.avatarUrl} />}
               <AvatarFallback className="text-[8px] bg-primary/10 text-primary font-bold">
                 {product.creator.avatar}
               </AvatarFallback>

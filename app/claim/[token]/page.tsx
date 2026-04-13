@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,14 +9,87 @@ import { Download, CheckCircle2, XCircle, Loader2, ShoppingBag, Zap } from 'luci
 import { ROUTES } from '@/lib/constants/routes'
 import type { ClaimState } from '@/types'
 
+interface ClaimData {
+  downloadUrl: string
+  fileName: string
+}
+
 export default function ClaimPage() {
+  const { token } = useParams<{ token: string }>()
   const [state, setState] = useState<ClaimState>('validating')
+  const [claimData, setClaimData] = useState<ClaimData | null>(null)
 
   useEffect(() => {
-    // Simulate token validation
-    const timer = setTimeout(() => setState('ready'), 1500)
-    return () => clearTimeout(timer)
-  }, [])
+    if (!token) {
+      setState('invalid')
+      return
+    }
+
+    const validateToken = async () => {
+      try {
+        const res = await fetch(`/api/claim/${token}`, {
+          redirect: 'manual',
+        })
+
+        if (res.type === 'opaqueredirect' || res.status === 302) {
+          // The API returned a redirect — extract the location or follow it
+          const location = res.headers.get('Location')
+          if (location) {
+            setClaimData({ downloadUrl: location, fileName: 'download' })
+            setState('ready')
+          } else {
+            // Fallback: use the claim URL directly as the download
+            setClaimData({ downloadUrl: `/api/claim/${token}`, fileName: 'download' })
+            setState('ready')
+          }
+          return
+        }
+
+        if (res.ok) {
+          const data = await res.json()
+          if (data.downloadUrl) {
+            setClaimData({ downloadUrl: data.downloadUrl, fileName: data.fileName ?? 'download' })
+            setState('ready')
+          } else if (data.error) {
+            if (data.error === 'used' || data.code === 'TOKEN_USED') {
+              setState('used')
+            } else if (data.error === 'expired' || data.code === 'TOKEN_EXPIRED') {
+              setState('expired')
+            } else {
+              setState('invalid')
+            }
+          } else {
+            // Assume the response itself is the claim data
+            setClaimData({ downloadUrl: `/api/claim/${token}`, fileName: data.fileName ?? 'download' })
+            setState('ready')
+          }
+          return
+        }
+
+        // Error responses
+        if (res.status === 410) {
+          setState('used')
+        } else if (res.status === 404) {
+          setState('invalid')
+        } else if (res.status === 403) {
+          setState('expired')
+        } else {
+          setState('invalid')
+        }
+      } catch (err) {
+        console.error('Claim validation failed:', err)
+        setState('invalid')
+      }
+    }
+
+    validateToken()
+  }, [token])
+
+  const handleDownload = () => {
+    if (claimData?.downloadUrl) {
+      window.open(claimData.downloadUrl, '_blank')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background grid-pattern flex items-center justify-center p-4">
@@ -46,9 +120,9 @@ export default function ClaimPage() {
                 </div>
                 <div>
                   <h2 className="font-heading font-bold text-lg">Your download is ready</h2>
-                  <p className="text-sm text-muted-foreground mt-1">nextjs-saas-starter-v2.zip</p>
+                  <p className="text-sm text-muted-foreground mt-1">{claimData?.fileName ?? 'download'}</p>
                 </div>
-                <Button size="lg" className="w-full h-14 text-base font-bold rounded-xl gap-2">
+                <Button onClick={handleDownload} size="lg" className="w-full h-14 text-base font-bold rounded-xl gap-2">
                   <Download className="w-5 h-5" /> Download File
                 </Button>
                 <p className="text-xs text-muted-foreground">This link can only be used once</p>

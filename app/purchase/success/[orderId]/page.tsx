@@ -1,18 +1,40 @@
 'use client'
 
+import { useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { CheckCircle2, Download, Mail, ShoppingBag, ArrowRight } from 'lucide-react'
+import { CheckCircle2, Download, Mail, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react'
 import { TxLink } from '@/components/shared/TxLink'
 import { PriceDisplay } from '@/components/shared/PriceDisplay'
-import { MOCK_ORDER_CONFIRMATION } from '@/lib/mock-data'
+import { useOrder } from '@/lib/api/orders'
 import { ROUTES } from '@/lib/constants/routes'
-import type { OrderConfirmation } from '@/types'
 
 export default function PurchaseSuccessPage() {
-  const order: OrderConfirmation = MOCK_ORDER_CONFIRMATION
+  const { orderId } = useParams<{ orderId: string }>()
+  const searchParams = useSearchParams()
+  const claimToken = searchParams.get('token')
+
+  const { data, isLoading } = useOrder(orderId ?? '')
+
+  if (isLoading || !data) {
+    return (
+      <div className="min-h-screen bg-background grid-pattern flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-6 text-center">
+          <Loader2 className="w-10 h-10 mx-auto text-primary animate-spin" />
+          <p className="text-muted-foreground">Loading order details...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const order = data.order
+  const productTitle = order.product?.title ?? 'Your product'
+  const fileName = order.product?.fileName ?? 'download'
+  const amount = parseFloat(order.amountUsdc)
+  const txHash = order.starknetTxHash
+  const downloadToken = claimToken
 
   return (
     <div className="min-h-screen bg-background grid-pattern flex items-center justify-center p-4">
@@ -31,29 +53,32 @@ export default function PurchaseSuccessPage() {
 
             {/* Product Info */}
             <div className="p-4 rounded-xl bg-muted/20 border border-border/50">
-              <p className="font-bold text-sm">{order.product.title}</p>
-              <PriceDisplay amount={order.amount} className="text-2xl font-bold mt-2 inline-block" />
+              <p className="font-bold text-sm">{productTitle}</p>
+              <PriceDisplay amount={amount} className="text-2xl font-bold mt-2 inline-block" />
             </div>
 
             {/* Download Button */}
-            <Link href={ROUTES.CLAIM(order.claimToken)} target="_blank">
-              <Button size="lg" className="w-full h-14 text-base font-bold rounded-xl gap-2">
-                <Download className="w-5 h-5" />
-                Download {order.product.fileName}
-              </Button>
-            </Link>
-
-            {/* Email confirmation */}
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Mail className="w-4 h-4" />
-              <span>A copy has been sent to {order.email}</span>
-            </div>
+            {downloadToken ? (
+              <Link href={ROUTES.CLAIM(downloadToken)} target="_blank">
+                <Button size="lg" className="w-full h-14 text-base font-bold rounded-xl gap-2">
+                  <Download className="w-5 h-5" />
+                  Download {fileName}
+                </Button>
+              </Link>
+            ) : (
+              <Link href={ROUTES.MY_PURCHASES}>
+                <Button size="lg" className="w-full h-14 text-base font-bold rounded-xl gap-2">
+                  <Download className="w-5 h-5" />
+                  Go to My Purchases to download
+                </Button>
+              </Link>
+            )}
 
             <Separator />
 
             {/* Transaction */}
             <div className="text-xs text-muted-foreground space-y-1">
-              <p>Transaction: <TxLink hash={order.txHash} /></p>
+              {txHash && <p>Transaction: <TxLink hash={txHash} /></p>}
               <p>Order ID: {order.id}</p>
             </div>
 

@@ -1,16 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Zap, ArrowRight, ArrowLeft, Check, Store, Upload, Sparkles } from 'lucide-react'
+import { Zap, ArrowRight, ArrowLeft, Check, Store, Upload, Sparkles, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { ROUTES } from '@/lib/constants/routes'
+import { useUpdateProfile } from '@/lib/api/users'
+import { useUploadImage } from '@/lib/api/products'
+import { toast } from 'sonner'
 
 const steps = [
   { id: 1, label: 'Profile' },
@@ -20,7 +24,49 @@ const steps = [
 ]
 
 export default function OnboardingPage() {
+  const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
+
+  const [displayName, setDisplayName] = useState('')
+  const [username, setUsername] = useState('')
+  const [bio, setBio] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const updateProfile = useUpdateProfile()
+  const uploadImage = useUploadImage()
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const result = await uploadImage.mutateAsync(file)
+      setAvatarUrl(result.url)
+      toast.success('Avatar uploaded')
+    } catch {
+      toast.error('Failed to upload avatar')
+    }
+  }
+
+  const handleNext = async () => {
+    if (currentStep === 3) {
+      // Save profile on finish
+      try {
+        await updateProfile.mutateAsync({
+          displayName,
+          username,
+          bio,
+          avatarUrl: avatarUrl ?? undefined,
+        })
+        toast.success('Profile saved!')
+        setCurrentStep(4)
+      } catch {
+        toast.error('Failed to save profile')
+      }
+      return
+    }
+    setCurrentStep(Math.min(4, currentStep + 1))
+  }
 
   return (
     <div className="min-h-screen bg-background grid-pattern flex items-center justify-center p-4">
@@ -65,13 +111,13 @@ export default function OnboardingPage() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Display Name</Label>
-                  <Input placeholder="e.g. DevPro Studio" className="h-12 rounded-xl" />
+                  <Input placeholder="e.g. DevPro Studio" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="h-12 rounded-xl" />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Username</Label>
                   <div className="flex gap-2">
                     <Badge variant="outline" className="h-12 px-3 rounded-xl font-mono">zapstore.xyz/store/</Badge>
-                    <Input placeholder="devpro" className="h-12 rounded-xl flex-1" />
+                    <Input placeholder="devpro" value={username} onChange={(e) => setUsername(e.target.value)} className="h-12 rounded-xl flex-1" />
                   </div>
                 </div>
               </div>
@@ -84,14 +130,24 @@ export default function OnboardingPage() {
                   <p className="text-sm text-muted-foreground mt-1">Tell buyers about your store</p>
                 </div>
                 <div className="flex justify-center">
-                  <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-border/50 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
-                    <Upload className="w-8 h-8 text-muted-foreground/30" />
+                  <input type="file" ref={avatarInputRef} className="hidden" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarUpload} />
+                  <div
+                    className="w-24 h-24 rounded-2xl border-2 border-dashed border-border/50 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors overflow-hidden"
+                    onClick={() => avatarInputRef.current?.click()}
+                  >
+                    {uploadImage.isPending ? (
+                      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                    ) : avatarUrl ? (
+                      <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <Upload className="w-8 h-8 text-muted-foreground/30" />
+                    )}
                   </div>
                 </div>
-                <p className="text-xs text-center text-muted-foreground">Upload a store avatar (optional)</p>
+                <p className="text-xs text-center text-muted-foreground">{avatarUrl ? 'Click to change avatar' : 'Upload a store avatar (optional)'}</p>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Bio</Label>
-                  <Textarea placeholder="Describe what you create..." className="min-h-[100px] rounded-xl resize-none" maxLength={500} />
+                  <Textarea placeholder="Describe what you create..." value={bio} onChange={(e) => setBio(e.target.value)} className="min-h-[100px] rounded-xl resize-none" maxLength={500} />
                 </div>
               </div>
             )}
@@ -144,9 +200,13 @@ export default function OnboardingPage() {
               <ArrowLeft className="w-4 h-4" /> Back
             </Button>
             <Button
-              onClick={() => setCurrentStep(Math.min(4, currentStep + 1))}
+              onClick={handleNext}
               className="gap-2"
+              disabled={updateProfile.isPending}
             >
+              {updateProfile.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : null}
               {currentStep === 3 ? 'Finish' : 'Continue'} <ArrowRight className="w-4 h-4" />
             </Button>
           </div>

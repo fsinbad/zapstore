@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -9,20 +9,53 @@ import { Input } from '@/components/ui/input'
 import { ArrowRight, Search, Zap, Store, ShieldCheck, Download, Sparkles } from 'lucide-react'
 import { heroTextVariants, fadeIn } from '@/lib/constants/animation'
 import { cn } from '@/lib/utils'
-import { FEATURED_PRODUCTS } from '@/lib/mock-data'
 import { CATEGORY_FILTERS } from '@/lib/constants/categories'
 import { ROUTES } from '@/lib/constants/routes'
 import { ProductCard } from '@/components/shared/ProductCard'
+import { GridSkeleton } from '@/components/shared/LoadingSkeletons'
+import { useProducts } from '@/lib/api/products'
+import type { ProductCardData } from '@/types'
+
+function mapToCardData(p: {
+  id: string
+  slug: string
+  title: string
+  shortDescription: string | null
+  price: string
+  category: string | null
+  coverImageUrl: string
+  creator: { username: string | null; displayName: string | null; avatarUrl: string | null }
+}): ProductCardData {
+  return {
+    id: p.id,
+    slug: p.slug,
+    title: p.title,
+    shortDescription: p.shortDescription ?? '',
+    price: Number(p.price),
+    category: (p.category ?? 'Other') as ProductCardData['category'],
+    coverImageUrl: p.coverImageUrl ?? null,
+    creator: {
+      username: p.creator.username ?? 'anonymous',
+      avatar: p.creator.displayName?.charAt(0).toUpperCase() ?? '?',
+      avatarUrl: p.creator.avatarUrl,
+    },
+  }
+}
 
 export default function MarketplacePage() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const filteredProducts = FEATURED_PRODUCTS.filter((p) => {
-    const matchesCategory = activeCategory === 'All' || p.category === activeCategory
-    const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
+  const { data, isLoading } = useProducts({
+    category: activeCategory !== 'All' ? activeCategory : undefined,
+    q: searchQuery || undefined,
+    limit: 6,
   })
+
+  const products = useMemo(
+    () => (data?.products ?? []).map(mapToCardData),
+    [data?.products]
+  )
 
   return (
     <div className="min-h-screen grid-pattern">
@@ -137,9 +170,11 @@ export default function MarketplacePage() {
             View all
           </Link>
         </div>
-        {filteredProducts.length > 0 ? (
+        {isLoading ? (
+          <GridSkeleton />
+        ) : products.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map((product) => (
+            {products.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>

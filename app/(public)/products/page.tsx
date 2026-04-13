@@ -1,32 +1,59 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Search, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { MOCK_PRODUCTS } from '@/lib/mock-data'
 import { CATEGORY_FILTERS } from '@/lib/constants/categories'
 import { ProductCard } from '@/components/shared/ProductCard'
+import { GridSkeleton } from '@/components/shared/LoadingSkeletons'
+import { useProducts } from '@/lib/api/products'
+import type { ProductCardData } from '@/types'
+
+function mapToCardData(p: {
+  id: string
+  slug: string
+  title: string
+  shortDescription: string | null
+  price: string
+  category: string | null
+  coverImageUrl: string
+  creator: { username: string | null; displayName: string | null; avatarUrl: string | null }
+}): ProductCardData {
+  return {
+    id: p.id,
+    slug: p.slug,
+    title: p.title,
+    shortDescription: p.shortDescription ?? '',
+    price: Number(p.price),
+    category: (p.category ?? 'Other') as ProductCardData['category'],
+    coverImageUrl: p.coverImageUrl ?? null,
+    creator: {
+      username: p.creator.username ?? 'anonymous',
+      avatar: p.creator.displayName?.charAt(0).toUpperCase() ?? '?',
+      avatarUrl: p.creator.avatarUrl,
+    },
+  }
+}
 
 export default function ProductsPage() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState('newest')
 
-  const filtered = MOCK_PRODUCTS
-    .filter((p) => {
-      const matchesCategory = activeCategory === 'All' || p.category === activeCategory
-      const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.shortDescription.toLowerCase().includes(searchQuery.toLowerCase())
-      return matchesCategory && matchesSearch
-    })
-    .sort((a, b) => {
-      if (sortBy === 'price_low') return a.price - b.price
-      if (sortBy === 'price_high') return b.price - a.price
-      return 0
-    })
+  const { data, isLoading } = useProducts({
+    category: activeCategory !== 'All' ? activeCategory : undefined,
+    sort: sortBy,
+    q: searchQuery || undefined,
+    limit: 12,
+  })
+
+  const products = useMemo(
+    () => (data?.products ?? []).map(mapToCardData),
+    [data?.products]
+  )
 
   return (
     <div className="min-h-screen pt-28 pb-16">
@@ -81,27 +108,33 @@ export default function ProductsPage() {
         </div>
 
         {/* Product Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {isLoading ? (
+          <GridSkeleton />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
 
-        {filtered.length === 0 && (
-          <div className="text-center py-20 text-muted-foreground">
-            <Search className="w-12 h-12 mx-auto mb-4 opacity-30" />
-            <p className="text-lg font-medium">No products found</p>
-            <p className="text-sm mt-1">Try adjusting your search or category filter</p>
-          </div>
-        )}
+            {products.length === 0 && (
+              <div className="text-center py-20 text-muted-foreground">
+                <Search className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                <p className="text-lg font-medium">No products found</p>
+                <p className="text-sm mt-1">Try adjusting your search or category filter</p>
+              </div>
+            )}
 
-        {/* Load More */}
-        {filtered.length > 0 && (
-          <div className="flex justify-center mt-12">
-            <Button variant="outline" size="lg" className="rounded-full px-8">
-              Load More
-            </Button>
-          </div>
+            {/* Load More */}
+            {products.length > 0 && (
+              <div className="flex justify-center mt-12">
+                <Button variant="outline" size="lg" className="rounded-full px-8">
+                  Load More
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

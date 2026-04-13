@@ -13,6 +13,7 @@ export interface Creator {
   username: string
   displayName: string
   avatar: string
+  avatarUrl?: string | null
   bio?: string
   productCount?: number
   memberSince?: string
@@ -25,7 +26,8 @@ export interface ProductCardData {
   shortDescription: string
   price: number
   category: ProductCategory
-  creator: Pick<Creator, 'username' | 'avatar'>
+  coverImageUrl: string | null
+  creator: Pick<Creator, 'username' | 'avatar' | 'avatarUrl'>
 }
 
 export interface Product extends ProductCardData {

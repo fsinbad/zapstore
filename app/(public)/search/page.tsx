@@ -1,26 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { Search, Sparkles } from 'lucide-react'
-import { MOCK_PRODUCTS } from '@/lib/mock-data'
 import { ROUTES } from '@/lib/constants/routes'
 import { PriceDisplay } from '@/components/shared/PriceDisplay'
+import { useProducts } from '@/lib/api/products'
 
 export default function SearchPage() {
   const [query, setQuery] = useState('')
 
-  const results = query.length > 0
-    ? MOCK_PRODUCTS.filter((p) =>
-        p.title.toLowerCase().includes(query.toLowerCase()) ||
-        p.shortDescription.toLowerCase().includes(query.toLowerCase()) ||
-        p.category.toLowerCase().includes(query.toLowerCase())
-      )
-    : []
+  const { data, isLoading } = useProducts(
+    query.length > 0 ? { q: query } : { q: undefined, limit: 0 }
+  )
+
+  const results = useMemo(() => {
+    if (query.length === 0) return []
+    return data?.products ?? []
+  }, [data?.products, query])
 
   return (
     <div className="min-h-screen pt-28 pb-16">
@@ -47,14 +48,21 @@ export default function SearchPage() {
           </div>
         )}
 
-        {query.length > 0 && results.length === 0 && (
+        {query.length > 0 && isLoading && (
+          <div className="text-center py-16 text-muted-foreground">
+            <span className="inline-block w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
+            <p className="text-sm">Searching...</p>
+          </div>
+        )}
+
+        {query.length > 0 && !isLoading && results.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <p className="text-lg font-medium">No results for &ldquo;{query}&rdquo;</p>
             <p className="text-sm mt-1">Try a different search term</p>
           </div>
         )}
 
-        {results.length > 0 && (
+        {results.length > 0 && !isLoading && (
           <>
             <p className="text-sm text-muted-foreground mb-6">{results.length} result{results.length !== 1 ? 's' : ''} for &ldquo;{query}&rdquo;</p>
             <div className="space-y-4">
@@ -62,20 +70,26 @@ export default function SearchPage() {
                 <Link key={product.id} href={ROUTES.PRODUCT(product.slug)}>
                   <Card className="border-border/50 bg-card hover:bg-muted/30 transition-colors">
                     <CardContent className="p-4 flex items-center gap-4">
-                      <div className="w-16 h-12 rounded-lg bg-muted/30 flex items-center justify-center flex-shrink-0">
-                        <Sparkles className="w-5 h-5 text-muted-foreground/30" />
+                      <div className="w-16 h-12 rounded-lg bg-muted/30 overflow-hidden flex items-center justify-center flex-shrink-0">
+                        {product.coverImageUrl ? (
+                          <img src={product.coverImageUrl} alt={product.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <Sparkles className="w-5 h-5 text-muted-foreground/30" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-heading font-bold text-sm truncate">{product.title}</h3>
                         <div className="flex items-center gap-2 mt-1">
                           <Avatar className="h-4 w-4">
-                            <AvatarFallback className="text-[6px] bg-primary/10 text-primary font-bold">{product.creator.avatar}</AvatarFallback>
+                            <AvatarFallback className="text-[6px] bg-primary/10 text-primary font-bold">
+                              {product.creator.displayName?.charAt(0).toUpperCase() ?? '?'}
+                            </AvatarFallback>
                           </Avatar>
-                          <span className="text-xs text-muted-foreground">{product.creator.username}</span>
+                          <span className="text-xs text-muted-foreground">{product.creator.username ?? 'anonymous'}</span>
                           <Badge variant="outline" className="text-[9px]">{product.category}</Badge>
                         </div>
                       </div>
-                      <PriceDisplay amount={product.price} className="font-bold text-sm whitespace-nowrap" suffixSize="xs" />
+                      <PriceDisplay amount={Number(product.price)} className="font-bold text-sm whitespace-nowrap" suffixSize="xs" />
                     </CardContent>
                   </Card>
                 </Link>

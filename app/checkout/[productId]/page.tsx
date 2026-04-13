@@ -1,39 +1,44 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ArrowLeft, ShieldCheck, Zap, Clock, Loader2, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { PriceDisplay } from '@/components/shared/PriceDisplay'
-import { MOCK_PRODUCT_DETAIL } from '@/lib/mock-data'
+import { usePurchaseFlow } from '@/hooks/usePurchaseFlow'
+import { useWallet } from '@/hooks/useWallet'
 import { ROUTES } from '@/lib/constants/routes'
-import type { CheckoutState } from '@/types'
 
 export default function CheckoutPage() {
-  const [state, setState] = useState<CheckoutState>('ready')
+  const { productId } = useParams<{ productId: string }>()
+  const router = useRouter()
+  const { isAuthenticated } = useWallet()
+  const { state, orderId, error, startPurchase, retry, reset } = usePurchaseFlow()
 
-  const product = {
-    title: MOCK_PRODUCT_DETAIL.title,
-    price: MOCK_PRODUCT_DETAIL.price,
-    creator: { displayName: MOCK_PRODUCT_DETAIL.creator.displayName, avatar: MOCK_PRODUCT_DETAIL.creator.avatar },
-    fileName: MOCK_PRODUCT_DETAIL.fileName,
-  }
+  // Redirect to success page once purchase completes
+  useEffect(() => {
+    if (state === 'success' && orderId) {
+      const timer = setTimeout(() => {
+        router.push(ROUTES.PURCHASE_SUCCESS(orderId))
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [state, orderId, router])
 
   const handlePurchase = () => {
-    setState('processing')
-    setTimeout(() => setState('success'), 3000)
+    if (productId) {
+      startPurchase(productId)
+    }
   }
 
   return (
     <div className="min-h-screen bg-background grid-pattern flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
-        <Link href={ROUTES.PRODUCT('nextjs-saas-template')} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Back to product
+        <Link href={ROUTES.HOME} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Back to store
         </Link>
 
         {/* Product Summary */}
@@ -44,19 +49,16 @@ export default function CheckoutPage() {
                 <Zap className="w-5 h-5 text-primary" />
               </div>
               <div className="flex-1">
-                <h2 className="font-heading font-bold text-sm">{product.title}</h2>
+                <h2 className="font-heading font-bold text-sm">Checkout</h2>
                 <div className="flex items-center gap-2 mt-1">
-                  <Avatar className="h-4 w-4">
-                    <AvatarFallback className="text-[6px] bg-primary/10 text-primary font-bold">{product.creator.avatar}</AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs text-muted-foreground">{product.creator.displayName}</span>
+                  <span className="text-xs text-muted-foreground">Order for product {productId}</span>
                 </div>
               </div>
             </div>
             <Separator className="my-4" />
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total</span>
-              <PriceDisplay amount={product.price} className="text-2xl font-bold" />
+              <span className="text-sm text-muted-foreground">Payment via</span>
+              <span className="text-sm font-medium">USDC on Starknet</span>
             </div>
           </CardContent>
         </Card>
@@ -67,13 +69,29 @@ export default function CheckoutPage() {
             {state === 'ready' && (
               <div className="space-y-4">
                 <Button onClick={handlePurchase} size="lg" className="w-full h-14 text-base font-bold rounded-xl">
-                  Confirm Purchase &mdash; <PriceDisplay amount={product.price} />
+                  Confirm Purchase
                 </Button>
                 <div className="flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
                   <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Secured by Starknet</span>
                   <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> Zero gas fees</span>
                   <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Instant delivery</span>
                 </div>
+              </div>
+            )}
+
+            {state === 'login' && (
+              <div className="text-center py-8 space-y-4">
+                <Loader2 className="w-10 h-10 mx-auto text-primary animate-spin" />
+                <h3 className="font-heading font-bold">Connecting your wallet...</h3>
+                <p className="text-sm text-muted-foreground">Please complete the login flow to continue</p>
+              </div>
+            )}
+
+            {state === 'balance_check' && (
+              <div className="text-center py-8 space-y-4">
+                <Loader2 className="w-10 h-10 mx-auto text-primary animate-spin" />
+                <h3 className="font-heading font-bold">Checking balance...</h3>
+                <p className="text-sm text-muted-foreground">Verifying your USDC balance on Starknet</p>
               </div>
             )}
 
@@ -92,11 +110,13 @@ export default function CheckoutPage() {
                 </div>
                 <h3 className="font-heading font-bold">Purchase complete!</h3>
                 <p className="text-sm text-muted-foreground">Redirecting to your download...</p>
-                <Link href={ROUTES.PURCHASE_SUCCESS('mock-order-123')}>
-                  <Button className="mt-4 rounded-xl gap-2">
-                    Download Now <ExternalLink className="w-4 h-4" />
-                  </Button>
-                </Link>
+                {orderId && (
+                  <Link href={ROUTES.PURCHASE_SUCCESS(orderId)}>
+                    <Button className="mt-4 rounded-xl gap-2">
+                      Download Now <ExternalLink className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                )}
               </div>
             )}
 
@@ -104,13 +124,13 @@ export default function CheckoutPage() {
               <div className="text-center py-6 space-y-4">
                 <AlertCircle className="w-10 h-10 mx-auto text-amber-500" />
                 <h3 className="font-heading font-bold">Insufficient USDC Balance</h3>
-                <p className="text-sm text-muted-foreground">You need <PriceDisplay amount={product.price} /> on Starknet</p>
+                <p className="text-sm text-muted-foreground">You need more USDC on Starknet to complete this purchase</p>
                 <div className="space-y-2 pt-2">
                   <Button variant="outline" className="w-full rounded-xl">Bridge from Ethereum</Button>
                   <Button variant="outline" className="w-full rounded-xl">Bridge via Starkgate</Button>
                   <Button variant="outline" className="w-full rounded-xl">Buy USDC directly</Button>
                 </div>
-                <Button variant="ghost" onClick={() => setState('ready')} className="mt-2 text-primary">I&apos;ve added funds</Button>
+                <Button variant="ghost" onClick={handlePurchase} className="mt-2 text-primary">I&apos;ve added funds</Button>
               </div>
             )}
 
@@ -118,8 +138,8 @@ export default function CheckoutPage() {
               <div className="text-center py-6 space-y-4">
                 <AlertCircle className="w-10 h-10 mx-auto text-destructive" />
                 <h3 className="font-heading font-bold">Payment did not complete</h3>
-                <p className="text-sm text-muted-foreground">Nothing was charged. Please try again.</p>
-                <Button onClick={() => setState('ready')} className="mt-4 rounded-xl">Try Again</Button>
+                <p className="text-sm text-muted-foreground">{error || 'Nothing was charged. Please try again.'}</p>
+                <Button onClick={retry} className="mt-4 rounded-xl">Try Again</Button>
               </div>
             )}
           </CardContent>
