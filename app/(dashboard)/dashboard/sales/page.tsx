@@ -12,19 +12,25 @@ import { Download, BarChart3, DollarSign, TrendingUp } from 'lucide-react'
 import { TxLink } from '@/components/shared/TxLink'
 import { AddressDisplay } from '@/components/shared/AddressDisplay'
 import { PriceDisplay } from '@/components/shared/PriceDisplay'
+import { TableSkeleton } from '@/components/shared/LoadingSkeletons'
 import { cn } from '@/lib/utils'
-import { MOCK_SALES } from '@/lib/mock-data'
-import type { Sale } from '@/types'
-
-const totalRevenue = MOCK_SALES.reduce((sum, s) => sum + s.amount, 0)
+import { useSales, type SaleItem } from '@/lib/api/orders'
 
 export default function SalesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [productFilter, setProductFilter] = useState('all')
 
-  const products = [...new Set(MOCK_SALES.map(s => s.product))]
+  const { data: salesData, isLoading } = useSales({
+    product: productFilter !== 'all' ? productFilter : undefined,
+  })
 
-  const filtered = MOCK_SALES.filter((s: Sale) => {
+  const sales = salesData?.sales ?? []
+  const total = salesData?.total ?? 0
+
+  const totalRevenue = sales.reduce((sum, s) => sum + parseFloat(s.amountUsdc), 0)
+  const products = [...new Set(sales.map((s) => s.product))]
+
+  const filtered = sales.filter((s) => {
     const matchesSearch = s.product.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesProduct = productFilter === 'all' || s.product === productFilter
     return matchesSearch && matchesProduct
@@ -46,8 +52,8 @@ export default function SalesPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Total Revenue', value: `$${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-green-500', bg: 'bg-green-500/10' },
-          { label: 'Total Sales', value: MOCK_SALES.length.toString(), icon: BarChart3, color: 'text-primary', bg: 'bg-primary/10' },
-          { label: 'Avg. Sale', value: `$${(totalRevenue / MOCK_SALES.length).toFixed(2)}`, icon: TrendingUp, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+          { label: 'Total Sales', value: total.toString(), icon: BarChart3, color: 'text-primary', bg: 'bg-primary/10' },
+          { label: 'Avg. Sale', value: total > 0 ? `$${(totalRevenue / total).toFixed(2)}` : '$0.00', icon: TrendingUp, color: 'text-purple-500', bg: 'bg-purple-500/10' },
         ].map((stat) => (
           <Card key={stat.label} className="border-border/50 bg-card/30">
             <CardContent className="p-5 flex items-center justify-between">
@@ -80,34 +86,38 @@ export default function SalesPage() {
       </div>
 
       {/* Sales Table */}
-      <div className="rounded-2xl border border-border/50 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/20">
-              <TableHead>Date</TableHead>
-              <TableHead>Product</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Buyer</TableHead>
-              <TableHead>Transaction</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((sale: Sale) => (
-              <TableRow key={sale.id} className="hover:bg-muted/10">
-                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{sale.date}</TableCell>
-                <TableCell className="font-medium text-sm">{sale.product}</TableCell>
-                <TableCell className="font-bold"><PriceDisplay amount={sale.amount} suffixSize="xs" /></TableCell>
-                <TableCell><AddressDisplay address={sale.buyer} /></TableCell>
-                <TableCell><TxLink hash={sale.txHash} /></TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="text-green-500 border-green-500/30 bg-green-500/5">{sale.status}</Badge>
-                </TableCell>
+      {isLoading ? (
+        <TableSkeleton />
+      ) : (
+        <div className="rounded-2xl border border-border/50 overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/20">
+                <TableHead>Date</TableHead>
+                <TableHead>Product</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Buyer</TableHead>
+                <TableHead>Transaction</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((sale: SaleItem) => (
+                <TableRow key={sale.id} className="hover:bg-muted/10">
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{sale.completedAt ?? '-'}</TableCell>
+                  <TableCell className="font-medium text-sm">{sale.product}</TableCell>
+                  <TableCell className="font-bold"><PriceDisplay amount={parseFloat(sale.amountUsdc)} suffixSize="xs" /></TableCell>
+                  <TableCell>{sale.buyerAddress ? <AddressDisplay address={sale.buyerAddress} /> : '-'}</TableCell>
+                  <TableCell>{sale.starknetTxHash ? <TxLink hash={sale.starknetTxHash} /> : '-'}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-green-500 border-green-500/30 bg-green-500/5">completed</Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   )
 }

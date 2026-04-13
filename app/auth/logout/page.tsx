@@ -2,17 +2,24 @@
 
 import { useEffect } from 'react'
 import { Loader2, Zap } from 'lucide-react'
+import { useWallet } from '@/hooks/useWallet'
 import { ROUTES } from '@/lib/constants/routes'
 
 export default function AuthLogoutPage() {
+  const { logout } = useWallet()
+
   useEffect(() => {
-    // In production: clear Privy session, disconnect wallet, clear Zustand stores
-    // Then redirect to homepage
-    const timer = setTimeout(() => {
-      window.location.href = ROUTES.HOME
-    }, 1500)
-    return () => clearTimeout(timer)
-  }, [])
+    const doLogout = async () => {
+      try {
+        await logout()
+      } catch (err) {
+        console.error('Logout error:', err)
+      } finally {
+        window.location.href = ROUTES.HOME
+      }
+    }
+    doLogout()
+  }, [logout])
 
   return (
     <div className="min-h-screen bg-background grid-pattern flex items-center justify-center">

@@ -1,0 +1,12 @@
+{
+  "name": "empty-package-stub",
+  "version": "0.0.1",
+  "description": "Empty stub for optional peer dependencies",
+  "main": "index.js",
+  "module": "index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./*": "./index.js"
+  }
+}
