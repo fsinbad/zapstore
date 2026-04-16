@@ -27,52 +27,19 @@ export default function ClaimPage() {
 
     const validateToken = async () => {
       try {
-        const res = await fetch(`/api/claim/${token}`, {
-          redirect: 'manual',
-        })
-
-        if (res.type === 'opaqueredirect' || res.status === 302) {
-          // The API returned a redirect — extract the location or follow it
-          const location = res.headers.get('Location')
-          if (location) {
-            setClaimData({ downloadUrl: location, fileName: 'download' })
-            setState('ready')
-          } else {
-            // Fallback: use the claim URL directly as the download
-            setClaimData({ downloadUrl: `/api/claim/${token}`, fileName: 'download' })
-            setState('ready')
-          }
-          return
-        }
+        const res = await fetch(`/api/claim/${token}`)
 
         if (res.ok) {
           const data = await res.json()
-          if (data.downloadUrl) {
-            setClaimData({ downloadUrl: data.downloadUrl, fileName: data.fileName ?? 'download' })
-            setState('ready')
-          } else if (data.error) {
-            if (data.error === 'used' || data.code === 'TOKEN_USED') {
-              setState('used')
-            } else if (data.error === 'expired' || data.code === 'TOKEN_EXPIRED') {
-              setState('expired')
-            } else {
-              setState('invalid')
-            }
-          } else {
-            // Assume the response itself is the claim data
-            setClaimData({ downloadUrl: `/api/claim/${token}`, fileName: data.fileName ?? 'download' })
-            setState('ready')
-          }
+          setClaimData({ downloadUrl: data.downloadUrl, fileName: data.fileName ?? 'download' })
+          setState('ready')
           return
         }
 
-        // Error responses
         if (res.status === 410) {
           setState('used')
         } else if (res.status === 404) {
           setState('invalid')
-        } else if (res.status === 403) {
-          setState('expired')
         } else {
           setState('invalid')
         }

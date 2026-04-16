@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     template: "%s | ZapStore",
   },
   description:
-    "Sell digital products with gasless USDC checkout on Starknet. 0% platform fee, self-custodied revenue, no MetaMask required.",
+    "Sell digital products with gasless USDC checkout on Starknet. 5% platform fee, self-custodied revenue, no MetaMask required.",
   keywords: [
     "digital products",
     "Starknet",
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     locale: "en_US",
     title: "ZapStore — Gasless Digital Product Storefront",
     description:
-      "Gumroad rebuilt on Starknet. Gasless checkout in USDC, 0% platform fee, self-custodied creator revenue.",
+      "Gumroad rebuilt on Starknet. Gasless checkout in USDC, 5% platform fee, self-custodied creator revenue.",
     siteName: "ZapStore",
   },
   twitter: {

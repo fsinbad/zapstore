@@ -52,7 +52,12 @@ export async function GET(request: NextRequest) {
         : null,
     }))
 
-    return Response.json(salesWithTruncatedAddress)
+    return Response.json({
+      sales: salesWithTruncatedAddress,
+      total: salesWithTruncatedAddress.length,
+      limit,
+      offset,
+    })
   } catch (error) {
     console.error('Error fetching sales:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

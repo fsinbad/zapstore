@@ -70,8 +70,7 @@ export async function GET(
       .set({ usedAt: new Date() })
       .where(eq(downloadTokens.id, downloadToken.id))
 
-    // Redirect to the signed URL
-    return Response.redirect(data.signedUrl, 302)
+    return Response.json({ downloadUrl: data.signedUrl, fileName: order.fileName })
   } catch (error) {
     console.error('Error processing claim:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

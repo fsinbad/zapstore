@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight, Menu, X, Zap } from 'lucide-react'
+import { ArrowRight, Menu, X, Zap, LayoutDashboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
+import { usePrivy } from '@privy-io/react-auth'
+import { ROUTES } from '@/lib/constants/routes'
 
 const navLinks = [
   { href: '/products', label: 'Browse' },
@@ -14,10 +17,21 @@ const navLinks = [
 
 export default function PublicNav() {
   const [isOpen, setIsOpen] = useState(false)
+  const { ready, authenticated, login } = usePrivy()
+  const router = useRouter()
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : 'unset'
   }, [isOpen])
+
+  const handleStartSelling = () => {
+    setIsOpen(false)
+    if (authenticated) {
+      router.push(ROUTES.DASHBOARD_PRODUCTS_NEW)
+    } else {
+      login()
+    }
+  }
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-24 flex items-center pointer-events-none">
@@ -48,16 +62,30 @@ export default function PublicNav() {
           {/* Right CTAs (Desktop) */}
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
-            <Link href="/dashboard">
-              <Button variant="ghost" className="text-muted-foreground py-4 rounded-xl">
-                Dashboard
+            {ready && authenticated ? (
+              <Link href={ROUTES.DASHBOARD}>
+                <Button variant="ghost" className="text-muted-foreground py-4 rounded-xl gap-2">
+                  <LayoutDashboard className="w-4 h-4" />
+                  Dashboard
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                variant="ghost"
+                className="text-muted-foreground py-4 rounded-xl"
+                onClick={() => login()}
+                disabled={!ready}
+              >
+                Sign In
               </Button>
-            </Link>
-            <Link href="/dashboard/products/new">
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-4 rounded-xl glow-blue gap-2">
-                Start Selling <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
+            )}
+            <Button
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-4 rounded-xl glow-blue gap-2"
+              onClick={handleStartSelling}
+              disabled={!ready}
+            >
+              Start Selling <ArrowRight className="w-4 h-4" />
+            </Button>
           </div>
 
           {/* Mobile Menu Toggle */}
@@ -95,16 +123,30 @@ export default function PublicNav() {
               ))}
               <div className="h-px bg-border/50 my-2" />
               <div className="flex flex-col gap-3">
-                <Link href="/dashboard" className="w-full" onClick={() => setIsOpen(false)}>
-                  <Button variant="ghost" className="w-full text-muted-foreground py-6 rounded-xl">
-                    Dashboard
+                {ready && authenticated ? (
+                  <Link href={ROUTES.DASHBOARD} className="w-full" onClick={() => setIsOpen(false)}>
+                    <Button variant="ghost" className="w-full text-muted-foreground py-6 rounded-xl gap-2">
+                      <LayoutDashboard className="w-4 h-4" />
+                      Dashboard
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    className="w-full text-muted-foreground py-6 rounded-xl"
+                    onClick={() => { setIsOpen(false); login() }}
+                    disabled={!ready}
+                  >
+                    Sign In
                   </Button>
-                </Link>
-                <Link href="/dashboard/products/new" className="w-full" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6 rounded-xl glow-blue">
-                    Start Selling
-                  </Button>
-                </Link>
+                )}
+                <Button
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6 rounded-xl glow-blue"
+                  onClick={handleStartSelling}
+                  disabled={!ready}
+                >
+                  Start Selling
+                </Button>
               </div>
             </motion.div>
           )}

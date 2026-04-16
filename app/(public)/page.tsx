@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -13,6 +14,7 @@ import { CATEGORY_FILTERS } from '@/lib/constants/categories'
 import { ROUTES } from '@/lib/constants/routes'
 import { ProductCard } from '@/components/shared/ProductCard'
 import { GridSkeleton } from '@/components/shared/LoadingSkeletons'
+import { usePrivy } from '@privy-io/react-auth'
 import { useProducts } from '@/lib/api/products'
 import type { ProductCardData } from '@/types'
 
@@ -45,6 +47,16 @@ function mapToCardData(p: {
 export default function MarketplacePage() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
+  const { ready, authenticated, login } = usePrivy()
+  const router = useRouter()
+
+  const handleStartSelling = () => {
+    if (authenticated) {
+      router.push(ROUTES.DASHBOARD_PRODUCTS_NEW)
+    } else {
+      login()
+    }
+  }
 
   const { data, isLoading } = useProducts({
     category: activeCategory !== 'All' ? activeCategory : undefined,
@@ -71,7 +83,7 @@ export default function MarketplacePage() {
 
           <motion.h1 custom={0} initial="hidden" animate="visible" variants={heroTextVariants} className="text-4xl sm:text-6xl lg:text-8xl font-heading font-bold leading-[1.1] tracking-tight">
             Sell your work. <br />
-            <span className="gradient-text">Keep 100%.</span>
+            <span className="gradient-text">Keep 95%.</span>
           </motion.h1>
 
           <motion.p custom={1} initial="hidden" animate="visible" variants={heroTextVariants} className="text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto mt-6 font-body">
@@ -93,11 +105,14 @@ export default function MarketplacePage() {
           </motion.div>
 
           <motion.div custom={3} initial="hidden" animate="visible" variants={heroTextVariants} className="flex items-center justify-center gap-4 mt-8">
-            <Link href={ROUTES.DASHBOARD_PRODUCTS_NEW}>
-              <Button size="lg" className="h-12 px-8 rounded-full font-semibold group transition-all hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(92,92,255,0.3)]">
-                Start Selling <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              className="h-12 px-8 rounded-full font-semibold group transition-all hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(92,92,255,0.3)]"
+              onClick={handleStartSelling}
+              disabled={!ready}
+            >
+              Start Selling <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
+            </Button>
             <Link href={ROUTES.PRODUCTS}>
               <Button size="lg" variant="outline" className="h-12 px-8 rounded-full border-border/40 hover:bg-muted/50">
                 Browse All
@@ -124,8 +139,8 @@ export default function MarketplacePage() {
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/10">
                 <Store className="h-5 w-5 text-secondary" />
               </div>
-              <CardTitle className="text-base">0% Platform Fee</CardTitle>
-              <CardDescription>No middleman. No commission. Revenue goes directly to your wallet.</CardDescription>
+              <CardTitle className="text-base">Just 5% Platform Fee</CardTitle>
+              <CardDescription>No monthly fees. Pay only on sales. Revenue goes directly to your wallet.</CardDescription>
             </CardHeader>
           </Card>
           <Card className="glass-card">

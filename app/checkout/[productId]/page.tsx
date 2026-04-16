@@ -16,17 +16,20 @@ export default function CheckoutPage() {
   const { productId } = useParams<{ productId: string }>()
   const router = useRouter()
   const { isAuthenticated } = useWallet()
-  const { state, orderId, error, startPurchase, retry, reset } = usePurchaseFlow()
+  const { state, orderId, downloadToken, error, startPurchase, retry, reset } = usePurchaseFlow()
 
   // Redirect to success page once purchase completes
   useEffect(() => {
     if (state === 'success' && orderId) {
       const timer = setTimeout(() => {
-        router.push(ROUTES.PURCHASE_SUCCESS(orderId))
+        const url = downloadToken
+          ? `${ROUTES.PURCHASE_SUCCESS(orderId)}?token=${downloadToken}`
+          : ROUTES.PURCHASE_SUCCESS(orderId)
+        router.push(url)
       }, 2000)
       return () => clearTimeout(timer)
     }
-  }, [state, orderId, router])
+  }, [state, orderId, downloadToken, router])
 
   const handlePurchase = () => {
     if (productId) {
@@ -111,7 +114,7 @@ export default function CheckoutPage() {
                 <h3 className="font-heading font-bold">Purchase complete!</h3>
                 <p className="text-sm text-muted-foreground">Redirecting to your download...</p>
                 {orderId && (
-                  <Link href={ROUTES.PURCHASE_SUCCESS(orderId)}>
+                  <Link href={downloadToken ? `${ROUTES.PURCHASE_SUCCESS(orderId)}?token=${downloadToken}` : ROUTES.PURCHASE_SUCCESS(orderId)}>
                     <Button className="mt-4 rounded-xl gap-2">
                       Download Now <ExternalLink className="w-4 h-4" />
                     </Button>

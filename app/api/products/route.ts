@@ -1,18 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { products, users } from '@/lib/db/schema'
-import { eq, desc, and, ilike, or, sql, asc } from 'drizzle-orm'
+import { eq, desc, and, ilike, or, sql, asc, ne } from 'drizzle-orm'
 import { requireCreator } from '@/lib/auth'
 
-// GET /api/products — List published products
+// GET /api/products — List published products (or creator's own with ?mine=true)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl
+    const mine = searchParams.get('mine') === 'true'
     const category = searchParams.get('category')
     const sort = searchParams.get('sort') || 'newest'
     const q = searchParams.get('q')
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '12', 10), 1), 100)
     const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10), 0)
+
+    // ?mine=true — return only the authenticated creator's products including drafts
+    if (mine) {
+      const user = await requireCreator(request)
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      const mineConditions = [
+        eq(products.creatorId, user.id),
+        ne(products.status, 'deleted'),
+      ]
+      if (q) {
+        mineConditions.push(
+          or(ilike(products.title, `%${q}%`), ilike(products.shortDescription, `%${q}%`))!,
+        )
+      }
+      const myProducts = await db
+        .select({
+          id: products.id,
+          slug: products.slug,
+          title: products.title,
+          shortDescription: products.shortDescription,
+          coverImageUrl: products.coverImageUrl,
+          price: products.priceUsdc,
+          category: products.category,
+          tags: products.tags,
+          status: products.status,
+          salesCount: products.salesCount,
+          totalRevenueUsdc: products.totalRevenueUsdc,
+          createdAt: products.createdAt,
+          creator: {
+            username: users.username,
+            displayName: users.displayName,
+            avatarUrl: users.avatarUrl,
+          },
+        })
+        .from(products)
+        .innerJoin(users, eq(products.creatorId, users.id))
+        .where(and(...mineConditions))
+        .orderBy(desc(products.createdAt))
+        .limit(limit)
+        .offset(offset)
+
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(products)
+        .where(and(...mineConditions))
+
+      return NextResponse.json({ products: myProducts, total: count, limit, offset })
+    }
 
     // Build where conditions
     const conditions = [eq(products.status, 'published')]
@@ -55,10 +106,12 @@ export async function GET(request: NextRequest) {
         title: products.title,
         shortDescription: products.shortDescription,
         coverImageUrl: products.coverImageUrl,
-        priceUsdc: products.priceUsdc,
+        price: products.priceUsdc,
         category: products.category,
         tags: products.tags,
+        status: products.status,
         salesCount: products.salesCount,
+        totalRevenueUsdc: products.totalRevenueUsdc,
         createdAt: products.createdAt,
         creator: {
           username: users.username,

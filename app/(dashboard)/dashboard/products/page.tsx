@@ -24,22 +24,22 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('all')
 
-  const { data, isLoading } = useProducts()
+  const { data, isLoading } = useProducts({ mine: true })
   const products = data?.products ?? []
   const deleteProduct = useDeleteProduct()
 
   const filtered = products.filter((p) => {
     const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesTab = activeTab === 'all' ||
-      (activeTab === 'published') ||
-      (activeTab === 'draft')
+      (activeTab === 'published' && p.status === 'published') ||
+      (activeTab === 'draft' && p.status === 'draft')
     return matchesSearch && matchesTab
   })
 
   const stats = {
     total: products.length,
-    published: products.length, // all returned from API are published by default
-    draft: 0, // draft count not available from list API yet
+    published: products.filter((p) => p.status === 'published').length,
+    draft: products.filter((p) => p.status === 'draft').length,
   }
 
   const handleDelete = async (productId: string) => {
@@ -205,7 +205,7 @@ function ProductRow({ product, onDelete }: { product: ProductListItem; onDelete:
                 <Eye className="w-4 h-4 mr-2" /> View
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive" onClick={() => onDelete(product.id)}>
+            <DropdownMenuItem className="text-destructive" onClick={() => onDelete(product.slug)}>
               <Trash2 className="w-4 h-4 mr-2" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>

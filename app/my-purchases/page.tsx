@@ -31,9 +31,7 @@ export default function MyPurchasesPage() {
     setReissuingId(orderId)
     try {
       const result = await reissueToken.mutateAsync(orderId)
-      if (result.claimUrl) {
-        window.open(result.claimUrl, '_blank')
-      }
+      window.open(ROUTES.CLAIM(result.downloadToken), '_blank')
     } catch (err) {
       console.error('Failed to reissue download token:', err)
     } finally {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Store, Mail, Save, ShieldCheck, Copy, Share2, Upload, ExternalLink, LogOut, Loader2 } from 'lucide-react'
 import { ROUTES } from '@/lib/constants/routes'
-import { useUpdateProfile } from '@/lib/api/users'
+import { useUpdateProfile, useCurrentUser } from '@/lib/api/users'
 import { useUploadImage } from '@/lib/api/products'
 import { useWallet } from '@/hooks/useWallet'
 import { toast } from 'sonner'
@@ -20,13 +20,25 @@ export default function SettingsPage() {
   const { wallet, logout } = useWallet()
   const updateProfile = useUpdateProfile()
   const uploadImage = useUploadImage()
+  const { data: userData } = useCurrentUser()
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
-  const [displayName, setDisplayName] = useState('DevPro Studio')
-  const [username, setUsername] = useState('devpro')
-  const [bio, setBio] = useState('Building production-ready developer tools and SaaS templates.')
-  const [email, setEmail] = useState('creator@zapstore.xyz')
+  const [displayName, setDisplayName] = useState('')
+  const [username, setUsername] = useState('')
+  const [bio, setBio] = useState('')
+  const [email, setEmail] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+
+  // Populate fields when user data loads
+  useEffect(() => {
+    if (!userData?.user) return
+    const u = userData.user
+    setDisplayName(u.displayName ?? '')
+    setUsername(u.username ?? '')
+    setBio(u.bio ?? '')
+    setEmail(u.email ?? '')
+    setAvatarUrl(u.avatarUrl ?? null)
+  }, [userData?.user])
 
   const walletAddress = wallet?.address ?? ''
   const storeUrl = `https://zapstore.xyz${ROUTES.STORE(username)}`

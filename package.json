@@ -10,10 +10,11 @@
   },
   "dependencies": {
     "@fatsolutions/tongo-sdk": "file:stubs/empty-package",
+    "@hookform/resolvers": "^5.2.2",
     "@hyperlane-xyz/registry": "file:stubs/empty-package",
     "@hyperlane-xyz/sdk": "file:stubs/empty-package",
     "@hyperlane-xyz/utils": "file:stubs/empty-package",
-    "@hookform/resolvers": "^5.2.2",
+    "@privy-io/node": "^0.14.0",
     "@privy-io/react-auth": "^3.19.0",
     "@privy-io/server-auth": "^1.32.5",
     "@radix-ui/react-accordion": "^1.2.12",

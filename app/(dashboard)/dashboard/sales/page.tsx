@@ -28,11 +28,11 @@ export default function SalesPage() {
   const total = salesData?.total ?? 0
 
   const totalRevenue = sales.reduce((sum, s) => sum + parseFloat(s.amountUsdc), 0)
-  const products = [...new Set(sales.map((s) => s.product))]
+  const products = [...new Set(sales.map((s) => s.productTitle))]
 
   const filtered = sales.filter((s) => {
-    const matchesSearch = s.product.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesProduct = productFilter === 'all' || s.product === productFilter
+    const matchesSearch = s.productTitle.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesProduct = productFilter === 'all' || s.productTitle === productFilter
     return matchesSearch && matchesProduct
   })
 
@@ -78,8 +78,8 @@ export default function SalesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Products</SelectItem>
-            {products.map((p) => (
-              <SelectItem key={p} value={p}>{p}</SelectItem>
+            {products.filter(Boolean).map((p) => (
+              <SelectItem key={p} value={p!}>{p}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -103,9 +103,11 @@ export default function SalesPage() {
             </TableHeader>
             <TableBody>
               {filtered.map((sale: SaleItem) => (
-                <TableRow key={sale.id} className="hover:bg-muted/10">
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{sale.completedAt ?? '-'}</TableCell>
-                  <TableCell className="font-medium text-sm">{sale.product}</TableCell>
+                <TableRow key={sale.orderId} className="hover:bg-muted/10">
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {sale.completedAt ? new Date(sale.completedAt).toLocaleDateString() : '-'}
+                  </TableCell>
+                  <TableCell className="font-medium text-sm">{sale.productTitle}</TableCell>
                   <TableCell className="font-bold"><PriceDisplay amount={parseFloat(sale.amountUsdc)} suffixSize="xs" /></TableCell>
                   <TableCell>{sale.buyerAddress ? <AddressDisplay address={sale.buyerAddress} /> : '-'}</TableCell>
                   <TableCell>{sale.starknetTxHash ? <TxLink hash={sale.starknetTxHash} /> : '-'}</TableCell>

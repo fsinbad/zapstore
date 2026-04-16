@@ -57,11 +57,28 @@ export async function POST(request: NextRequest) {
       )
       .limit(1)
 
+    // Platform fee: 5% by default (set PLATFORM_FEE_BPS env to override)
+    const feeBps = parseInt(process.env.PLATFORM_FEE_BPS || '500')
+    const feeRecipient = process.env.PLATFORM_FEE_RECIPIENT || null
+
+    const computeSplit = (totalUsdc: string) => {
+      const total = parseFloat(totalUsdc)
+      const fee = feeRecipient ? parseFloat((total * feeBps / 10000).toFixed(6)) : 0
+      const creator = parseFloat((total - fee).toFixed(6))
+      return {
+        creatorAmountUsdc: creator.toFixed(6),
+        feeAmountUsdc: fee.toFixed(6),
+      }
+    }
+
     if (existingOrder) {
+      const split = computeSplit(existingOrder.amountUsdc)
       return Response.json({
         orderId: existingOrder.id,
         creatorWallet: creator.starknetAddress,
         amountUsdc: existingOrder.amountUsdc,
+        ...split,
+        feeRecipient,
       })
     }
 
@@ -77,10 +94,13 @@ export async function POST(request: NextRequest) {
       })
       .returning()
 
+    const split = computeSplit(newOrder.amountUsdc)
     return Response.json({
       orderId: newOrder.id,
       creatorWallet: creator.starknetAddress,
       amountUsdc: newOrder.amountUsdc,
+      ...split,
+      feeRecipient,
     }, { status: 201 })
   } catch (error) {
     console.error('Error creating order:', error)
