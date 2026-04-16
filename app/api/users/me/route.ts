@@ -4,6 +4,32 @@ import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { requireUser } from '@/lib/auth'
 
+// GET /api/users/me — Fetch own profile
+export async function GET(request: NextRequest) {
+  try {
+    const user = await requireUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    return NextResponse.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        bio: user.bio,
+        email: user.email,
+        isCreator: user.isCreator,
+        starknetAddress: user.starknetAddress,
+        createdAt: user.createdAt,
+      },
+    })
+  } catch (error) {
+    console.error('GET /api/users/me error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
 // PATCH /api/users/me — Update own profile
 export async function PATCH(request: NextRequest) {
   try {

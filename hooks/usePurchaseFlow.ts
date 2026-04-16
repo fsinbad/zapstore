@@ -71,12 +71,22 @@ export function usePurchaseFlow(): PurchaseFlowResult {
         return
       }
 
-      // Step 4 — Payment initiation
+      // Step 4 — Payment: split between creator and platform fee
       setState('processing')
-      const tx = await wallet.transfer(USDC, [{
-        to: fromAddress(orderData.creatorWallet),
-        amount: requiredAmount,
-      }])
+      const creatorAmount = Amount.parse(orderData.creatorAmountUsdc, USDC)
+      const transfers: { to: ReturnType<typeof fromAddress>; amount: typeof creatorAmount }[] = [
+        { to: fromAddress(orderData.creatorWallet), amount: creatorAmount },
+      ]
+      if (
+        orderData.feeRecipient &&
+        parseFloat(orderData.feeAmountUsdc) > 0
+      ) {
+        transfers.push({
+          to: fromAddress(orderData.feeRecipient),
+          amount: Amount.parse(orderData.feeAmountUsdc, USDC),
+        })
+      }
+      const tx = await wallet.transfer(USDC, transfers)
 
       // Step 5 — Watch for L2 finality
       await new Promise<void>((resolve, reject) => {

@@ -1,11 +1,14 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { usePrivy } from '@privy-io/react-auth'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import MobileNav from './MobileNav'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
+import { Zap } from 'lucide-react'
 
 interface DashboardShellProps {
   children: React.ReactNode
@@ -13,6 +16,28 @@ interface DashboardShellProps {
 
 export default function DashboardShell({ children }: DashboardShellProps) {
   const { sidebarCollapsed } = useUiStore()
+  const { ready, authenticated } = usePrivy()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (ready && !authenticated) {
+      router.replace('/')
+    }
+  }, [ready, authenticated, router])
+
+  // Show nothing while Privy is loading or redirecting
+  if (!ready || !authenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Zap className="w-5 h-5 text-primary animate-pulse" />
+          </div>
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">

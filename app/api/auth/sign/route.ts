@@ -1,42 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { privyClient } from '@/lib/privy'
+import { privyClient, privyNodeClient } from '@/lib/privy'
 
 /**
  * POST /api/auth/sign
  *
- * Relay endpoint for Starkzap's PrivySigner.
- * Receives { walletId, hash } from the PrivySigner,
- * calls Privy's rawSign API with the app secret,
- * and returns { signature }.
+ * Signing relay for Starkzap's PrivySigner rawSign function.
+ * Requires a valid Privy Bearer token (verified before signing).
+ *
+ * Body: { walletId: string, hash: string }
+ * Response: { signature: string }  — hex-encoded Stark signature
  */
 export async function POST(request: NextRequest) {
   try {
+    // Verify the caller is authenticated
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Missing authorization' }, { status: 401 })
+    }
+    const accessToken = authHeader.replace('Bearer ', '')
+    await privyClient.verifyAuthToken(accessToken)
+
     const body = await request.json()
     const { walletId, hash } = body
 
     if (!walletId || !hash) {
-      return NextResponse.json(
-        { error: 'Missing walletId or hash' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing walletId or hash' }, { status: 400 })
     }
 
-    // Use Privy server SDK to sign the hash
-    // This is the rawSign endpoint that Starkzap's PrivySigner calls
-    const response = await (privyClient as any).walletApi.rpc({
-      walletId,
-      method: 'personal_sign',
-      params: { message: hash },
+    // Sign the hash using Privy's rawSign — Starknet curve signing.
+    // authorization_context.user_jwts allows Privy to exchange the user's JWT
+    // for a signing key, which authorizes server-side signing on their behalf.
+    const result = await privyNodeClient.wallets().rawSign(walletId, {
+      params: { hash },
+      authorization_context: { user_jwts: [accessToken] },
     })
 
-    return NextResponse.json({
-      signature: response.data?.signature || response.signature,
-    })
+    return NextResponse.json({ signature: result.signature })
   } catch (error) {
     console.error('Sign relay error:', error)
-    return NextResponse.json(
-      { error: 'Signing failed' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Signing failed' }, { status: 500 })
   }
 }

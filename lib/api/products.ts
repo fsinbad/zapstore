@@ -79,6 +79,7 @@ export function useProducts(filters: {
   q?: string
   limit?: number
   offset?: number
+  mine?: boolean
 } = {}) {
   return useQuery({
     queryKey: productKeys.list(filters),
@@ -89,6 +90,7 @@ export function useProducts(filters: {
         q: filters.q || undefined,
         limit: filters.limit || 12,
         offset: filters.offset || 0,
+        mine: filters.mine ? 'true' : undefined,
       }),
   })
 }

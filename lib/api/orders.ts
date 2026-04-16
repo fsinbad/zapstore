@@ -6,7 +6,10 @@ import { api } from './client'
 interface CreateOrderResponse {
   orderId: string
   creatorWallet: string
-  amountUsdc: string
+  amountUsdc: string         // total the buyer pays
+  creatorAmountUsdc: string  // creator receives (after fee)
+  feeAmountUsdc: string      // platform fee portion
+  feeRecipient: string | null
 }
 
 interface ConfirmOrderResponse {
@@ -58,11 +61,12 @@ interface PurchaseItem {
 }
 
 interface SaleItem {
-  id: string
+  orderId: string
+  productId: string
   amountUsdc: string
   starknetTxHash: string | null
   completedAt: string | null
-  product: string
+  productTitle: string
   buyerAddress: string | null
 }
 

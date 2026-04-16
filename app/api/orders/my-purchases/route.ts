@@ -11,14 +11,11 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const purchases = await db
+    const rows = await db
       .select({
         id: orders.id,
-        productId: orders.productId,
         amountUsdc: orders.amountUsdc,
-        starknetTxHash: orders.starknetTxHash,
         status: orders.status,
-        createdAt: orders.createdAt,
         completedAt: orders.completedAt,
         productTitle: products.title,
         productSlug: products.slug,
@@ -38,7 +35,24 @@ export async function GET(request: NextRequest) {
       )
       .orderBy(desc(orders.completedAt))
 
-    return Response.json(purchases)
+    const purchases = rows.map((r) => ({
+      id: r.id,
+      amountUsdc: r.amountUsdc,
+      status: r.status,
+      completedAt: r.completedAt?.toISOString() ?? null,
+      product: {
+        title: r.productTitle,
+        slug: r.productSlug,
+        coverImageUrl: r.productCoverImageUrl ?? '',
+        fileName: r.productFileName ?? '',
+      },
+      creator: {
+        displayName: r.creatorDisplayName,
+        username: r.creatorUsername,
+      },
+    }))
+
+    return Response.json({ purchases })
   } catch (error) {
     console.error('Error fetching purchases:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

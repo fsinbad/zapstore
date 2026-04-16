@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { privyClient } from '@/lib/privy'
+import { privyClient, privyNodeClient } from '@/lib/privy'
 
 /**
  * POST /api/auth/signer-context
  *
- * Called by the Starkzap PrivySigner during onboard().
- * Verifies the Privy access token, looks up (or creates) the user's
- * Starknet embedded wallet, and returns the signer context that
- * Starkzap needs: { walletId, publicKey, serverUrl }.
+ * Called by Starkzap's PrivySigner during onboard().
+ * Verifies the Privy access token, finds (or creates) the user's
+ * Starknet wallet via @privy-io/node, and returns:
+ *   { walletId, publicKey }
+ *
+ * The caller (useWallet.ts) attaches a rawSign function that calls
+ * /api/auth/sign with proper auth — no serverUrl needed here.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -18,42 +21,45 @@ export async function POST(request: NextRequest) {
 
     const accessToken = authHeader.replace('Bearer ', '')
 
-    // Verify the Privy token and get user
+    // Verify the Privy token → get userId
     const verifiedClaims = await privyClient.verifyAuthToken(accessToken)
     const userId = verifiedClaims.userId
 
-    // Get user's wallets from Privy
-    const user = await privyClient.getUser(userId)
+    // Look for an existing Starknet wallet for this user
+    let starknetWallet: { id: string; public_key?: string; address: string } | null = null
 
-    // Find or identify the Starknet-compatible wallet
-    // Privy embedded wallets are EVM-based, but Starkzap's PrivySigner
-    // uses Privy's rawSign endpoint to sign Starknet transactions.
-    // We look for the embedded wallet.
-    const embeddedWallet = user.linkedAccounts.find(
-      (account) => account.type === 'wallet' && account.walletClientType === 'privy'
-    )
+    for await (const wallet of privyNodeClient.wallets().list({
+      chain_type: 'starknet',
+      user_id: userId,
+    })) {
+      starknetWallet = wallet
+      break
+    }
 
-    if (!embeddedWallet || !('address' in embeddedWallet)) {
+    // If none found, create one now
+    if (!starknetWallet) {
+      starknetWallet = await privyNodeClient.wallets().create({
+        chain_type: 'starknet',
+        owner: { user_id: userId },
+      })
+    }
+
+    if (!starknetWallet.public_key) {
       return NextResponse.json(
-        { error: 'No embedded wallet found. Please try logging in again.' },
-        { status: 404 }
+        { error: 'Starknet wallet has no public key' },
+        { status: 500 },
       )
     }
 
-    // Build the sign endpoint URL
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const serverUrl = `${appUrl}/api/auth/sign`
-
     return NextResponse.json({
-      walletId: embeddedWallet.address, // Privy wallet identifier
-      publicKey: embeddedWallet.address, // Will be derived by Starkzap
-      serverUrl,
+      walletId: starknetWallet.id,
+      publicKey: starknetWallet.public_key,
     })
   } catch (error) {
     console.error('Signer context error:', error)
     return NextResponse.json(
       { error: 'Failed to get signer context' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

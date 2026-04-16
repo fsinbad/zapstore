@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
         starknetAddress: starknetAddress || null,
         email,
         displayName,
-        isCreator: false,
+        isCreator: true,
       })
       .returning()
 

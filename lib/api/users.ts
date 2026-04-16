@@ -9,7 +9,9 @@ interface UserProfile {
   displayName: string | null
   avatarUrl: string | null
   bio: string | null
+  email: string | null
   isCreator: boolean
+  starknetAddress: string | null
   createdAt: string
 }
 
@@ -34,6 +36,13 @@ export function useUserProfile(username: string) {
     queryKey: userKeys.profile(username),
     queryFn: () => api.get<{ user: UserProfile }>(`/api/users/${username}`),
     enabled: !!username,
+  })
+}
+
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: userKeys.me,
+    queryFn: () => api.get<{ user: UserProfile }>('/api/users/me'),
   })
 }
 

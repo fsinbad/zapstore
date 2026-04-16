@@ -19,6 +19,9 @@ import { cn } from '@/lib/utils'
 import { useUiStore } from '@/store/uiStore'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useCurrentUser } from '@/lib/api/users'
+import { useWallet } from '@/hooks/useWallet'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 const navSections = [
   {
@@ -46,6 +49,15 @@ const navSections = [
 export default function Sidebar() {
   const pathname = usePathname()
   const { sidebarCollapsed, toggleSidebarCollapse } = useUiStore()
+  const { data: userData } = useCurrentUser()
+  const { logout } = useWallet()
+
+  const user = userData?.user
+  const displayName = user?.displayName ?? user?.username ?? 'Creator'
+  const email = user?.email ?? ''
+  const initials = displayName.slice(0, 2).toUpperCase()
+  const avatarUrl = user?.avatarUrl ?? null
+  const storeUsername = user?.username ?? 'me'
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -120,19 +132,20 @@ export default function Sidebar() {
         {/* Footer */}
         <div className="p-4 border-t border-border space-y-4">
           {/* View Store */}
-          <Link href="/store/creator" className={cn("flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors", sidebarCollapsed && "justify-center")}>
+          <Link href={`/store/${storeUsername}`} className={cn("flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors", sidebarCollapsed && "justify-center")}>
             <Store className="w-5 h-5 flex-shrink-0" />
             {!sidebarCollapsed && <span>View My Store</span>}
           </Link>
 
           <div className={cn("flex items-center gap-3", sidebarCollapsed && "justify-center")}>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-primary/60 flex items-center justify-center text-primary-foreground text-xs font-bold">
-              ZC
-            </div>
+            <Avatar className="w-8 h-8 flex-shrink-0">
+              {avatarUrl && <AvatarImage src={avatarUrl} />}
+              <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">{initials}</AvatarFallback>
+            </Avatar>
             {!sidebarCollapsed && (
               <div className="flex flex-col min-w-0">
-                <span className="text-sm font-semibold truncate">Zap Creator</span>
-                <span className="text-xs text-muted-foreground truncate">creator@zapstore.xyz</span>
+                <span className="text-sm font-semibold truncate">{displayName}</span>
+                {email && <span className="text-xs text-muted-foreground truncate">{email}</span>}
               </div>
             )}
           </div>
@@ -142,6 +155,7 @@ export default function Sidebar() {
               "w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10",
               sidebarCollapsed && "px-0 justify-center"
             )}
+            onClick={() => logout()}
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
             {!sidebarCollapsed && <span>Logout</span>}

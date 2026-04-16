@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { products, users } from '@/lib/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, or } from 'drizzle-orm'
 import { requireCreator } from '@/lib/auth'
 
 // GET /api/products/[slug] — Get single product by slug
@@ -24,7 +24,7 @@ export async function GET(
         fileName: products.fileName,
         fileSizeBytes: products.fileSizeBytes,
         fileMimeType: products.fileMimeType,
-        priceUsdc: products.priceUsdc,
+        price: products.priceUsdc,
         category: products.category,
         tags: products.tags,
         status: products.status,
@@ -40,7 +40,7 @@ export async function GET(
       })
       .from(products)
       .innerJoin(users, eq(products.creatorId, users.id))
-      .where(eq(products.slug, slug))
+      .where(or(eq(products.slug, slug), eq(products.id, slug)))
       .limit(1)
 
     if (!row) {

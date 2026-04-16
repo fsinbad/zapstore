@@ -12,13 +12,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
+import { useCurrentUser } from '@/lib/api/users'
+import { useWallet } from '@/hooks/useWallet'
 
 export default function TopBar() {
   const pathname = usePathname()
+  const { data: userData } = useCurrentUser()
+  const { logout } = useWallet()
+
+  const user = userData?.user
+  const displayName = user?.displayName ?? user?.username ?? 'Creator'
+  const email = user?.email ?? ''
+  const initials = displayName.slice(0, 2).toUpperCase()
+  const avatarUrl = user?.avatarUrl ?? null
 
   const getPageTitle = () => {
     if (pathname === '/dashboard') return 'Overview'
@@ -62,17 +72,17 @@ export default function TopBar() {
 
         <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full">
           <Bell className="w-5 h-5 text-muted-foreground" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full border-2 border-background" />
         </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 md:w-auto md:gap-3 rounded-full md:rounded-xl p-0 md:px-2 md:py-1.5 overflow-hidden border border-transparent hover:border-border transition-all">
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">ZC</AvatarFallback>
+                {avatarUrl && <AvatarImage src={avatarUrl} />}
+                <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">{initials}</AvatarFallback>
               </Avatar>
               <div className="hidden md:flex flex-col items-start min-w-0 pr-1">
-                <span className="text-sm font-semibold truncate leading-none mb-1">Zap Creator</span>
+                <span className="text-sm font-semibold truncate leading-none mb-1">{displayName}</span>
                 <span className="text-[10px] text-muted-foreground leading-none">Creator</span>
               </div>
             </Button>
@@ -80,8 +90,8 @@ export default function TopBar() {
           <DropdownMenuContent align="end" className="w-56 mt-2">
             <DropdownMenuLabel>
               <div className="flex flex-col">
-                <span className="text-sm font-bold">Zap Creator</span>
-                <span className="text-xs text-muted-foreground font-normal">creator@zapstore.xyz</span>
+                <span className="text-sm font-bold">{displayName}</span>
+                {email && <span className="text-xs text-muted-foreground font-normal">{email}</span>}
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -92,7 +102,10 @@ export default function TopBar() {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive cursor-pointer">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive cursor-pointer"
+              onClick={() => logout()}
+            >
               <LogOut className="w-4 h-4 mr-2" />
               Log Out
             </DropdownMenuItem>
