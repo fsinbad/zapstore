@@ -40,7 +40,7 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json()
 
-    const allowedFields = ['displayName', 'username', 'bio', 'avatarUrl'] as const
+    const allowedFields = ['displayName', 'username', 'bio', 'avatarUrl', 'email'] as const
     const updates: Record<string, unknown> = {}
 
     for (const field of allowedFields) {

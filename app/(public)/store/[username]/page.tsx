@@ -31,7 +31,8 @@ function mapToCardData(p: {
     category: (p.category ?? 'Other') as ProductCardData['category'],
     coverImageUrl: p.coverImageUrl ?? null,
     creator: {
-      username: p.creator.username ?? 'anonymous',
+      username: p.creator.username ?? '',
+      displayName: p.creator.displayName ?? p.creator.username ?? 'Anonymous',
       avatar: p.creator.displayName?.charAt(0).toUpperCase() ?? '?',
       avatarUrl: p.creator.avatarUrl,
     },
@@ -57,10 +58,11 @@ export default function StorePage() {
   const { data, isLoading } = useStoreProducts(username)
 
   const profile = data?.profile as {
+    username?: string
     displayName?: string
     bio?: string
     avatarUrl?: string
-    memberSince?: string
+    createdAt?: string
   } | undefined
 
   const products = useMemo(
@@ -97,8 +99,8 @@ export default function StorePage() {
             <h1 className="text-2xl font-heading font-bold tracking-tight">{displayName}</h1>
             <p className="text-muted-foreground text-sm max-w-lg">{profile?.bio ?? ''}</p>
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              {profile?.memberSince && (
-                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Joined {profile.memberSince}</span>
+              {profile?.createdAt && (
+                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Joined {new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
               )}
               <span className="flex items-center gap-1"><Package className="w-3 h-3" /> {products.length} products</span>
             </div>

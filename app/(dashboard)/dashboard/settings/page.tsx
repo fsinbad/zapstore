@@ -41,7 +41,7 @@ export default function SettingsPage() {
   }, [userData?.user])
 
   const walletAddress = wallet?.address ?? ''
-  const storeUrl = `https://zapstore.xyz${ROUTES.STORE(username)}`
+  const storeUrl = `https://zapstore-one.vercel.app${ROUTES.STORE(username)}`
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -61,6 +61,7 @@ export default function SettingsPage() {
         displayName,
         username,
         bio,
+        email,
         avatarUrl: avatarUrl ?? undefined,
       })
       toast.success('Settings saved!')
@@ -213,7 +214,24 @@ export default function SettingsPage() {
                 <Button variant="outline" className="flex-1 rounded-xl font-bold gap-2" onClick={() => { navigator.clipboard.writeText(storeUrl); toast.success('Link copied') }}>
                   <Copy size={16} /> Copy
                 </Button>
-                <Button className="flex-1 rounded-xl font-bold gap-2" onClick={() => { if (navigator.share) navigator.share({ url: storeUrl }) }}>
+                <Button
+                  className="flex-1 rounded-xl font-bold gap-2"
+                  onClick={async () => {
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({ title: 'My ZapStore', url: storeUrl })
+                        toast.success('Store link shared!')
+                      } catch (err) {
+                        // AbortError = user cancelled the share sheet — fall back to clipboard
+                        await navigator.clipboard.writeText(storeUrl)
+                        toast.success('Link copied to clipboard')
+                      }
+                    } else {
+                      await navigator.clipboard.writeText(storeUrl)
+                      toast.success('Link copied to clipboard')
+                    }
+                  }}
+                >
                   <Share2 size={16} /> Share
                 </Button>
               </div>

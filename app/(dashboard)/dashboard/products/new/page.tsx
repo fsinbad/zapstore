@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Upload, Image as ImageIcon, FileUp, Save, X, Loader2 } from 'lucide-react'
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { ROUTES } from '@/lib/constants/routes'
 import { PRODUCT_CATEGORIES } from '@/lib/constants/categories'
 import { useCreateProduct, useUploadImage, useUploadFile } from '@/lib/api/products'
@@ -129,13 +129,11 @@ export default function NewProductPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Full Description (Markdown)</Label>
-            <Textarea
-              id="description"
-              placeholder="Describe your product in detail. Supports Markdown."
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Full Description</Label>
+            <RichTextEditor
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="min-h-[200px] rounded-xl bg-muted/20 border-transparent focus:bg-background transition-all resize-y"
+              onChange={setDescription}
+              placeholder="Describe your product in detail — what's included, who it's for, what they'll get."
             />
           </div>
 
@@ -143,7 +141,7 @@ export default function NewProductPage() {
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Category</Label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="h-12 rounded-xl bg-muted/20 border-transparent">
+                <SelectTrigger className="h-12 w-full rounded-xl bg-muted/20 border-transparent">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>

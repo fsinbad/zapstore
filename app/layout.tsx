@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import ReactQueryProvider from "@/components/providers/ReactQueryProvider"
 import PrivyProvider from "@/components/providers/PrivyProvider"
 import { Toaster } from "@/components/ui/sonner"
+import { NetworkStatus } from "@/components/shared/NetworkStatus"
 
 const fontHeading = Outfit({
   subsets: ["latin"],
@@ -25,7 +26,7 @@ const fontMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://zapstore.xyz"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://zapstore-one.vercel.app"),
   title: {
     default: "ZapStore — Gasless Digital Product Storefront",
     template: "%s | ZapStore",
@@ -88,6 +89,7 @@ export default function RootLayout({
           <PrivyProvider>
             <ReactQueryProvider>
               {children}
+              <NetworkStatus />
               <Toaster richColors closeButton position="bottom-right" />
             </ReactQueryProvider>
           </PrivyProvider>

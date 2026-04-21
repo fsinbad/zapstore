@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { privyClient, privyNodeClient } from '@/lib/privy'
+import { db } from '@/lib/db'
+import { users } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 /**
  * POST /api/auth/signer-context
  *
  * Called by Starkzap's PrivySigner during onboard().
- * Verifies the Privy access token, finds (or creates) the user's
- * Starknet wallet via @privy-io/node, and returns:
+ * Verifies the Privy access token, finds (or creates) an app-managed
+ * Starknet wallet for this user, stores the wallet ID in the DB, and returns:
  *   { walletId, publicKey }
  *
- * The caller (useWallet.ts) attaches a rawSign function that calls
- * /api/auth/sign with proper auth — no serverUrl needed here.
+ * Wallets are created WITHOUT owner.user_id so the server can sign them
+ * without requiring user authorization tokens.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -23,38 +26,53 @@ export async function POST(request: NextRequest) {
 
     // Verify the Privy token → get userId
     const verifiedClaims = await privyClient.verifyAuthToken(accessToken)
-    const userId = verifiedClaims.userId
+    const privyUserId = verifiedClaims.userId
 
-    // Look for an existing Starknet wallet for this user
-    let starknetWallet: { id: string; public_key?: string; address: string } | null = null
+    // Look up the user record to find stored wallet ID
+    const [userRow] = await db
+      .select({ id: users.id, privyWalletId: users.privyWalletId })
+      .from(users)
+      .where(eq(users.privyUserId, privyUserId))
+      .limit(1)
 
-    for await (const wallet of privyNodeClient.wallets().list({
-      chain_type: 'starknet',
-      user_id: userId,
-    })) {
-      starknetWallet = wallet
-      break
+    if (!userRow) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // If none found, create one now
-    if (!starknetWallet) {
-      starknetWallet = await privyNodeClient.wallets().create({
+    let walletId = userRow.privyWalletId
+    let publicKey: string | undefined
+
+    if (walletId) {
+      // Fetch the existing wallet to get its public key
+      const wallet = await privyNodeClient.wallets().get(walletId)
+      publicKey = (wallet as { public_key?: string }).public_key
+    }
+
+    if (!walletId || !publicKey) {
+      // Create a new app-managed Starknet wallet (no owner.user_id so
+      // the server can sign it without user authorization)
+      const wallet = await privyNodeClient.wallets().create({
         chain_type: 'starknet',
-        owner: { user_id: userId },
       })
+
+      walletId = wallet.id
+      publicKey = (wallet as { public_key?: string }).public_key
+
+      // Persist wallet ID to the user record
+      await db
+        .update(users)
+        .set({ privyWalletId: walletId })
+        .where(eq(users.id, userRow.id))
     }
 
-    if (!starknetWallet.public_key) {
+    if (!publicKey) {
       return NextResponse.json(
         { error: 'Starknet wallet has no public key' },
         { status: 500 },
       )
     }
 
-    return NextResponse.json({
-      walletId: starknetWallet.id,
-      publicKey: starknetWallet.public_key,
-    })
+    return NextResponse.json({ walletId, publicKey })
   } catch (error) {
     console.error('Signer context error:', error)
     return NextResponse.json(

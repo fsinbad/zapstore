@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { products, users } from '@/lib/db/schema'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, or } from 'drizzle-orm'
 
 // GET /api/store/[username] — Get creator profile + published products
 export async function GET(
@@ -11,7 +11,8 @@ export async function GET(
   try {
     const { username } = await params
 
-    // Look up the user by username
+    // Look up the user by username or ID (ID fallback for users without a username yet)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(username)
     const [user] = await db
       .select({
         id: users.id,
@@ -23,7 +24,7 @@ export async function GET(
         createdAt: users.createdAt,
       })
       .from(users)
-      .where(eq(users.username, username))
+      .where(isUUID ? or(eq(users.username, username), eq(users.id, username)) : eq(users.username, username))
       .limit(1)
 
     if (!user) {
@@ -42,7 +43,7 @@ export async function GET(
         title: products.title,
         shortDescription: products.shortDescription,
         coverImageUrl: products.coverImageUrl,
-        priceUsdc: products.priceUsdc,
+        price: products.priceUsdc,
         category: products.category,
         tags: products.tags,
         salesCount: products.salesCount,
@@ -52,15 +53,22 @@ export async function GET(
       .where(and(eq(products.creatorId, user.id), eq(products.status, 'published')))
       .orderBy(desc(products.createdAt))
 
+    // Attach creator to every product so ProductCard mapToCardData works
+    const creator = {
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+    }
+
     return NextResponse.json({
-      creator: {
+      profile: {
         username: user.username,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
         bio: user.bio,
         createdAt: user.createdAt,
       },
-      products: creatorProducts,
+      products: creatorProducts.map((p) => ({ ...p, creator })),
     })
   } catch (error) {
     console.error('GET /api/store/[username] error:', error)

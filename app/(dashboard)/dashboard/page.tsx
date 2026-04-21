@@ -46,7 +46,7 @@ export default function DashboardPage() {
     return sum.toFixed(2)
   }, [salesData?.sales])
 
-  const storeUsername = userData?.user?.username ?? 'me'
+  const storeUsername = userData?.user?.username ?? userData?.user?.id ?? ''
 
   const stats = [
     { label: 'Total Revenue', value: `$${totalRevenue} USDC`, change: `${salesData?.total ?? 0} sales`, trend: 'up' as const, icon: DollarSign, color: 'text-green-500', bgColor: 'bg-green-500/10' },

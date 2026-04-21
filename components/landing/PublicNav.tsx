@@ -1,13 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight, Menu, X, Zap, LayoutDashboard } from 'lucide-react'
+import { ArrowRight, Menu, X, Zap, LayoutDashboard, LogOut, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { usePrivy } from '@privy-io/react-auth'
+import { useWallet } from '@/hooks/useWallet'
 import { ROUTES } from '@/lib/constants/routes'
 
 const navLinks = [
@@ -17,8 +25,34 @@ const navLinks = [
 
 export default function PublicNav() {
   const [isOpen, setIsOpen] = useState(false)
-  const { ready, authenticated, login } = usePrivy()
+  const { ready, authenticated, login, user: privyUser } = usePrivy()
+  const { logout } = useWallet()
   const router = useRouter()
+
+  // Derive a short display label for the avatar button
+  const displayName =
+    privyUser?.google?.name?.split(' ')[0] ??
+    privyUser?.email?.address?.split('@')[0] ??
+    privyUser?.twitter?.username ??
+    null
+  const prevAuthenticated = useRef(authenticated)
+
+  // Central post-login redirect handler.
+  // Fires only on the false → true transition (login event).
+  // Reads the destination that was stored in sessionStorage by whoever triggered login:
+  //   - "Start Selling" in nav → ROUTES.DASHBOARD
+  //   - "Buy Now" in product page → current product URL (handled by usePurchaseFlow; this is a no-op redirect)
+  //   - "Sign In" in nav → nothing stored, stays on current page
+  useEffect(() => {
+    if (authenticated && !prevAuthenticated.current) {
+      const dest = sessionStorage.getItem('postLoginRedirect')
+      if (dest) {
+        sessionStorage.removeItem('postLoginRedirect')
+        router.push(dest)
+      }
+    }
+    prevAuthenticated.current = authenticated
+  }, [authenticated, router])
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : 'unset'
@@ -29,8 +63,16 @@ export default function PublicNav() {
     if (authenticated) {
       router.push(ROUTES.DASHBOARD_PRODUCTS_NEW)
     } else {
+      // Store destination so the central handler above redirects correctly
+      sessionStorage.setItem('postLoginRedirect', ROUTES.DASHBOARD)
       login()
     }
+  }
+
+  const handleSignIn = () => {
+    setIsOpen(false)
+    // No postLoginRedirect — user stays on current page after signing in
+    login()
   }
 
   return (
@@ -63,17 +105,37 @@ export default function PublicNav() {
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
             {ready && authenticated ? (
-              <Link href={ROUTES.DASHBOARD}>
-                <Button variant="ghost" className="text-muted-foreground py-4 rounded-xl gap-2">
-                  <LayoutDashboard className="w-4 h-4" />
-                  Dashboard
-                </Button>
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="text-muted-foreground py-4 rounded-xl gap-2 focus-visible:ring-0">
+                    <div className="w-6 h-6 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0">
+                      <User className="w-3.5 h-3.5 text-primary" />
+                    </div>
+                    <span className="max-w-[80px] truncate text-sm">{displayName ?? 'Account'}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem asChild>
+                    <Link href={ROUTES.DASHBOARD} className="flex items-center gap-2 cursor-pointer">
+                      <LayoutDashboard className="w-4 h-4" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="flex items-center gap-2 text-destructive focus:text-destructive cursor-pointer"
+                    onClick={() => logout()}
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <Button
                 variant="ghost"
                 className="text-muted-foreground py-4 rounded-xl"
-                onClick={() => login()}
+                onClick={handleSignIn}
                 disabled={!ready}
               >
                 Sign In
@@ -124,17 +186,27 @@ export default function PublicNav() {
               <div className="h-px bg-border/50 my-2" />
               <div className="flex flex-col gap-3">
                 {ready && authenticated ? (
-                  <Link href={ROUTES.DASHBOARD} className="w-full" onClick={() => setIsOpen(false)}>
-                    <Button variant="ghost" className="w-full text-muted-foreground py-6 rounded-xl gap-2">
-                      <LayoutDashboard className="w-4 h-4" />
-                      Dashboard
+                  <>
+                    <Link href={ROUTES.DASHBOARD} className="w-full" onClick={() => setIsOpen(false)}>
+                      <Button variant="ghost" className="w-full text-muted-foreground py-6 rounded-xl gap-2">
+                        <LayoutDashboard className="w-4 h-4" />
+                        Dashboard
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 py-6 rounded-xl gap-2"
+                      onClick={() => { setIsOpen(false); logout() }}
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
                     </Button>
-                  </Link>
+                  </>
                 ) : (
                   <Button
                     variant="ghost"
                     className="w-full text-muted-foreground py-6 rounded-xl"
-                    onClick={() => { setIsOpen(false); login() }}
+                    onClick={handleSignIn}
                     disabled={!ready}
                   >
                     Sign In

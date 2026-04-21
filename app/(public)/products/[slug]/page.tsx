@@ -1,6 +1,7 @@
 'use client'
 
 import { useParams } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,11 +9,29 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ShieldCheck, Zap, Clock, FileText, ArrowLeft, Sparkles, Heart } from 'lucide-react'
+import { ShieldCheck, Zap, Clock, FileText, ArrowLeft, Sparkles, Heart, Wallet } from 'lucide-react'
 import { ROUTES } from '@/lib/constants/routes'
 import { PriceDisplay } from '@/components/shared/PriceDisplay'
-import { useProduct, useStoreProducts } from '@/lib/api/products'
+import { useProduct, useStoreProducts, useProductPurchaseStatus } from '@/lib/api/products'
 import { usePurchaseFlow } from '@/hooks/usePurchaseFlow'
+import { WalletFundingDialog } from '@/components/shared/WalletFundingDialog'
+import { useWallet } from '@/hooks/useWallet'
+import { api } from '@/lib/api/client'
+import { toast } from 'sonner'
+
+/** Fetch a cross-origin URL as a blob and trigger a browser save-file dialog. */
+async function triggerBlobDownload(url: string, fileName: string) {
+  const res = await fetch(url)
+  const blob = await res.blob()
+  const blobUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(blobUrl)
+}
 
 function formatFileSize(bytes: number | null): string {
   if (!bytes) return 'Unknown size'
@@ -21,7 +40,7 @@ function formatFileSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function PurchaseButtonLabel({ state }: { state: string }) {
+function PurchaseButtonLabel({ state, paymentSubmitted }: { state: string; paymentSubmitted: boolean }) {
   switch (state) {
     case 'login':
       return (
@@ -47,9 +66,9 @@ function PurchaseButtonLabel({ state }: { state: string }) {
     case 'success':
       return <>Purchase complete!</>
     case 'insufficient':
-      return <>Insufficient USDC balance</>
+      return <>Fund Wallet to Purchase</>
     case 'error':
-      return <>Retry Purchase</>
+      return <>{paymentSubmitted ? 'Confirm Purchase' : 'Retry Purchase'}</>
     default:
       return null // handled inline
   }
@@ -93,12 +112,109 @@ function ProductDetailSkeleton() {
 export default function ProductPage() {
   const { slug } = useParams<{ slug: string }>()
   const { data, isLoading } = useProduct(slug)
-  const { state, startPurchase, retry, error: purchaseError } = usePurchaseFlow()
+  const { state, startPurchase, retry, reset, error: purchaseError, requiredUsdc, needsStrk, paymentSubmitted, claimUrl } = usePurchaseFlow()
+  const { wallet, balance, strkBalance, isAuthenticated, login, refreshBalance } = useWallet()
+  const [fundingOpen, setFundingOpen] = useState(false)
+  const [reissuing, setReissuing] = useState(false)
+
+  const { data: purchaseStatus } = useProductPurchaseStatus(slug, isAuthenticated)
+  const alreadyPurchased = purchaseStatus?.purchased ?? false
+  const existingOrderId = purchaseStatus?.orderId ?? null
+
+  const handleReissueDownload = async () => {
+    // Not logged in — trigger Privy auth and resume after redirect/popup completes
+    if (!isAuthenticated) {
+      sessionStorage.setItem('pendingRedownloadSlug', slug)
+      login()
+      return
+    }
+    if (!existingOrderId || reissuing) return
+    setReissuing(true)
+    try {
+      const { claimUrl: reissueClaimUrl } = await api.post<{ claimUrl: string }>(
+        `/api/purchases/${existingOrderId}/reissue`
+      )
+      if (!reissueClaimUrl) return
+      const { downloadUrl, fileName } = await api.get<{ downloadUrl: string; fileName: string }>(reissueClaimUrl)
+      if (!downloadUrl) return
+      await triggerBlobDownload(downloadUrl, fileName ?? 'download')
+    } catch (err) {
+      console.error('Reissue download failed:', err)
+      toast.error('Could not prepare your download. Please try again.')
+    } finally {
+      setReissuing(false)
+    }
+  }
 
   const product = data?.product ?? null
   const creatorUsername = product?.creator?.username ?? ''
   const { data: storeData } = useStoreProducts(creatorUsername)
   const moreProducts = (storeData?.products ?? []).filter((p) => p.slug !== slug).slice(0, 3)
+
+  // After login completes, auto-resume a pending redownload (for logged-out buyers).
+  // Waits for existingOrderId so the purchase-status query has resolved.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const pendingSlug = sessionStorage.getItem('pendingRedownloadSlug')
+    if (!pendingSlug || pendingSlug !== slug) return
+    if (!existingOrderId) return  // purchase-status query still loading
+    sessionStorage.removeItem('pendingRedownloadSlug')
+    handleReissueDownload()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, existingOrderId, slug])
+
+  // If a logged-out buyer clicked "Buy Now" and got redirected through login,
+  // but already owns this product — cancel the pending purchase intent so the
+  // flow in usePurchaseFlow doesn't auto-resume and attempt a double charge.
+  useEffect(() => {
+    if (!isAuthenticated || !alreadyPurchased) return
+    const pendingId = sessionStorage.getItem('pendingPurchaseProductId')
+    if (pendingId && product && pendingId === product.id) {
+      sessionStorage.removeItem('pendingPurchaseProductId')
+    }
+  }, [isAuthenticated, alreadyPurchased, product])
+
+  // Fetch balances as soon as the wallet is available
+  useEffect(() => {
+    if (wallet) refreshBalance()
+  }, [wallet, refreshBalance])
+
+  // Trigger file download as soon as purchase is confirmed
+  useEffect(() => {
+    if (state !== 'success' || !claimUrl) return
+    fetch(claimUrl)
+      .then((r) => r.json())
+      .then(({ downloadUrl, fileName }: { downloadUrl?: string; fileName?: string }) => {
+        if (!downloadUrl) return
+        triggerBlobDownload(downloadUrl, fileName ?? 'download').catch(console.error)
+      })
+      .catch(console.error)
+  }, [state, claimUrl])
+
+  // Open funding dialog automatically when insufficient balance detected
+  useEffect(() => {
+    if (state === 'insufficient') {
+      setFundingOpen(true)
+    }
+  }, [state])
+
+  // When payment is submitted but confirmation failed, auto-retry once.
+  // A ref prevents re-triggering if the retry itself fails.
+  const autoRetriedRef = useRef(false)
+  useEffect(() => {
+    if (state === 'error' && paymentSubmitted && !autoRetriedRef.current) {
+      autoRetriedRef.current = true
+      toast.loading('Payment sent — confirming your order…', { duration: 6000 })
+      retry()
+      return
+    }
+    if (state !== 'error') {
+      autoRetriedRef.current = false
+    }
+    if (state === 'error' && purchaseError && !paymentSubmitted) {
+      toast.error(purchaseError, { duration: 6000 })
+    }
+  }, [state, purchaseError, paymentSubmitted, retry])
 
   if (isLoading || !product) {
     return <ProductDetailSkeleton />
@@ -111,6 +227,8 @@ export default function ProductPage() {
   const handleBuy = () => {
     if (state === 'error') {
       retry()
+    } else if (state === 'insufficient') {
+      setFundingOpen(true)
     } else {
       startPurchase(product.id)
     }
@@ -163,19 +281,10 @@ export default function ProductPage() {
             {/* Description */}
             <div>
               <h2 className="text-lg font-heading font-bold mb-4">About this product</h2>
-              <div className="prose prose-sm prose-invert max-w-none space-y-4 text-muted-foreground">
-                {(product.descriptionMd ?? '').split('\n\n').map((block, i) => {
-                  if (block.startsWith('## ')) return <h3 key={i} className="text-foreground font-heading font-bold text-base mt-6 mb-2">{block.replace('## ', '')}</h3>
-                  if (block.startsWith('- ')) return (
-                    <ul key={i} className="space-y-1">
-                      {block.split('\n').map((line, j) => (
-                        <li key={j} className="text-sm">{line.replace('- ', '')}</li>
-                      ))}
-                    </ul>
-                  )
-                  return <p key={i} className="text-sm leading-relaxed">{block}</p>
-                })}
-              </div>
+              <div
+                className="rich-text text-sm text-muted-foreground"
+                dangerouslySetInnerHTML={{ __html: product.descriptionMd ?? '' }}
+              />
             </div>
 
             {/* Tags */}
@@ -238,23 +347,85 @@ export default function ProductPage() {
                     <span>{formatFileSize(product.fileSizeBytes)}</span>
                   </div>
 
-                  {/* Buy Button */}
-                  <Button
-                    size="lg"
-                    className="w-full h-14 text-base font-bold rounded-xl"
-                    disabled={isProcessing || state === 'success' || state === 'insufficient'}
-                    onClick={handleBuy}
-                  >
-                    {state === 'ready' ? (
-                      <>Buy Now &mdash; <PriceDisplay amount={price} /></>
-                    ) : (
-                      <PurchaseButtonLabel state={state} />
-                    )}
-                  </Button>
+                  {/* Buy Button — hidden once purchase is confirmed in this session or DB */}
+                  {!alreadyPurchased && state !== 'success' && (
+                    <Button
+                      size="lg"
+                      className="w-full h-14 text-base font-bold rounded-xl"
+                      disabled={isProcessing || state === 'insufficient'}
+                      onClick={handleBuy}
+                    >
+                      {state === 'ready' ? (
+                        <>Buy Now &mdash; <PriceDisplay amount={price} /></>
+                      ) : (
+                        <PurchaseButtonLabel state={state} paymentSubmitted={paymentSubmitted} />
+                      )}
+                    </Button>
+                  )}
 
-                  {/* Error message */}
-                  {state === 'error' && purchaseError && (
-                    <p className="text-sm text-destructive text-center">{purchaseError}</p>
+                  {/* Download button — shown when purchase was confirmed in DB (page refresh safe) */}
+                  {(alreadyPurchased || state === 'success') && (
+                    <Button
+                      size="lg"
+                      className="w-full h-14 text-base font-bold rounded-xl"
+                      disabled={reissuing}
+                      onClick={alreadyPurchased && state !== 'success' ? handleReissueDownload : undefined}
+                    >
+                      {reissuing ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                          Preparing download…
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <FileText className="w-4 h-4" />
+                          Download your file
+                        </span>
+                      )}
+                    </Button>
+                  )}
+
+                  {/* Inline download link after fresh purchase (one-time token) */}
+                  {state === 'success' && claimUrl && (
+                    <a
+                      href={claimUrl}
+                      className="w-full flex items-center justify-center gap-2 text-sm font-medium text-primary hover:underline"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        fetch(claimUrl)
+                          .then((r) => r.json())
+                          .then(({ downloadUrl, fileName }: { downloadUrl?: string; fileName?: string }) => {
+                            if (!downloadUrl) return
+                            triggerBlobDownload(downloadUrl, fileName ?? 'download').catch(console.error)
+                          })
+                          .catch(console.error)
+                      }}
+                    >
+                      <FileText className="w-4 h-4" />
+                      Download your file
+                    </a>
+                  )}
+
+                  {/* Wallet button — always visible when authenticated */}
+                  {isAuthenticated && (
+                    <button
+                      onClick={() => setFundingOpen(true)}
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted/30 border border-border/40 hover:bg-muted/50 hover:border-border/60 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Wallet className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                        <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">My Wallet</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs tabular-nums">
+                        <span className="text-muted-foreground">
+                          <span className="font-semibold text-foreground">${parseFloat(balance ?? '0').toFixed(2)}</span> USDC
+                        </span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-muted-foreground">
+                          <span className="font-semibold text-foreground">{parseFloat(strkBalance ?? '0').toFixed(3)}</span> STRK
+                        </span>
+                      </div>
+                    </button>
                   )}
 
                   {/* Trust signals */}
@@ -282,17 +453,29 @@ export default function ProductPage() {
                       <AvatarFallback className="bg-primary/10 text-primary font-bold">{avatarInitial}</AvatarFallback>
                     </Avatar>
                     <div>
-                      <Link href={ROUTES.STORE(product.creator.username ?? 'anonymous')} className="font-heading font-bold text-sm hover:text-primary transition-colors">
-                        {product.creator.displayName ?? 'Anonymous'}
-                      </Link>
+                      {product.creator.username ? (
+                        <Link href={ROUTES.STORE(product.creator.username)} className="font-heading font-bold text-sm hover:text-primary transition-colors">
+                          {product.creator.displayName ?? product.creator.username}
+                        </Link>
+                      ) : (
+                        <span className="font-heading font-bold text-sm">
+                          {product.creator.displayName ?? 'Anonymous'}
+                        </span>
+                      )}
                       <p className="text-xs text-muted-foreground">{product.creator.productCount ?? 0} products</p>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">{product.creator.bio ?? ''}</p>
                   <div className="flex gap-2 mt-4">
-                    <Button variant="outline" size="sm" className="flex-1 rounded-lg" asChild>
-                      <Link href={ROUTES.STORE(product.creator.username ?? 'anonymous')}>View Store</Link>
-                    </Button>
+                    {product.creator.username ? (
+                      <Button variant="outline" size="sm" className="flex-1 rounded-lg" asChild>
+                        <Link href={ROUTES.STORE(product.creator.username)}>View Store</Link>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" className="flex-1 rounded-lg" disabled>
+                        View Store
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="rounded-lg">
                       <Heart className="w-4 h-4" />
                     </Button>
@@ -303,6 +486,17 @@ export default function ProductPage() {
           </div>
         </div>
       </div>
+
+      <WalletFundingDialog
+        open={fundingOpen}
+        onClose={() => setFundingOpen(false)}
+        requiredUsdc={requiredUsdc ?? String(price)}
+        needsStrk={needsStrk}
+        onRetry={() => {
+          reset()
+          startPurchase(product.id)
+        }}
+      />
     </div>
   )
 }

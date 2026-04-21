@@ -15,6 +15,7 @@ import { relations } from 'drizzle-orm'
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   privyUserId: text('privy_user_id').unique().notNull(),
+  privyWalletId: text('privy_wallet_id'),
   starknetAddress: text('starknet_address'),
   email: text('email'),
   displayName: text('display_name'),
@@ -30,6 +31,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   products: many(products),
   buyerOrders: many(orders, { relationName: 'buyerOrders' }),
   creatorOrders: many(orders, { relationName: 'creatorOrders' }),
+  withdrawals: many(withdrawals),
 }))
 
 // ─── Products ────────────────────────────────────────────
@@ -116,6 +118,24 @@ export const downloadTokensRelations = relations(downloadTokens, ({ one }) => ({
   }),
 }))
 
+// ─── Withdrawals ─────────────────────────────────────────
+
+export const withdrawals = pgTable('withdrawals', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  amountUsdc: numeric('amount_usdc', { precision: 10, scale: 6 }).notNull(),
+  destinationAddress: text('destination_address').notNull(),
+  txHash: text('tx_hash'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+export const withdrawalsRelations = relations(withdrawals, ({ one }) => ({
+  user: one(users, {
+    fields: [withdrawals.userId],
+    references: [users.id],
+  }),
+}))
+
 // ─── Type Exports (inferred from schema) ─────────────────
 
 export type InsertUser = typeof users.$inferInsert
@@ -126,3 +146,5 @@ export type InsertOrder = typeof orders.$inferInsert
 export type SelectOrder = typeof orders.$inferSelect
 export type InsertDownloadToken = typeof downloadTokens.$inferInsert
 export type SelectDownloadToken = typeof downloadTokens.$inferSelect
+export type InsertWithdrawal = typeof withdrawals.$inferInsert
+export type SelectWithdrawal = typeof withdrawals.$inferSelect

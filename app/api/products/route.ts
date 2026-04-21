@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     const conditions = [eq(products.status, 'published')]
 
     if (category) {
-      conditions.push(eq(products.category, category))
+      conditions.push(eq(products.category, category.toLowerCase()))
     }
 
     if (q) {
