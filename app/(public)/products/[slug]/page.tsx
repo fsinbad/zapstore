@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ShieldCheck, Zap, Clock, FileText, ArrowLeft, Sparkles, Heart, Wallet } from 'lucide-react'
+import { ShieldCheck, Zap, Clock, FileText, ArrowLeft, Sparkles, Heart, Wallet, CheckCircle } from 'lucide-react'
 import { ROUTES } from '@/lib/constants/routes'
 import { PriceDisplay } from '@/components/shared/PriceDisplay'
 import { useProduct, useStoreProducts, useProductPurchaseStatus } from '@/lib/api/products'
@@ -116,6 +116,9 @@ export default function ProductPage() {
   const { wallet, balance, strkBalance, isAuthenticated, login, refreshBalance } = useWallet()
   const [fundingOpen, setFundingOpen] = useState(false)
   const [reissuing, setReissuing] = useState(false)
+  const [freshDownloadUrl, setFreshDownloadUrl] = useState<string | null>(null)
+  const [freshDownloadFileName, setFreshDownloadFileName] = useState('download')
+  const [downloadTriggered, setDownloadTriggered] = useState(false)
 
   const { data: purchaseStatus } = useProductPurchaseStatus(slug, isAuthenticated)
   const alreadyPurchased = purchaseStatus?.purchased ?? false
@@ -179,13 +182,17 @@ export default function ProductPage() {
     if (wallet) refreshBalance()
   }, [wallet, refreshBalance])
 
-  // Trigger file download as soon as purchase is confirmed
+  // Trigger file download as soon as purchase is confirmed.
+  // Saves the signed downloadUrl so the button can retry without re-consuming the claim token.
   useEffect(() => {
     if (state !== 'success' || !claimUrl) return
     fetch(claimUrl)
       .then((r) => r.json())
       .then(({ downloadUrl, fileName }: { downloadUrl?: string; fileName?: string }) => {
         if (!downloadUrl) return
+        setFreshDownloadUrl(downloadUrl)
+        setFreshDownloadFileName(fileName ?? 'download')
+        setDownloadTriggered(true)
         triggerBlobDownload(downloadUrl, fileName ?? 'download').catch(console.error)
       })
       .catch(console.error)
@@ -363,47 +370,42 @@ export default function ProductPage() {
                     </Button>
                   )}
 
-                  {/* Download button — shown when purchase was confirmed in DB (page refresh safe) */}
+                  {/* Download button — shown after purchase (fresh or returning) */}
                   {(alreadyPurchased || state === 'success') && (
-                    <Button
-                      size="lg"
-                      className="w-full h-14 text-base font-bold rounded-xl"
-                      disabled={reissuing}
-                      onClick={alreadyPurchased && state !== 'success' ? handleReissueDownload : undefined}
-                    >
-                      {reissuing ? (
-                        <span className="flex items-center gap-2">
-                          <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                          Preparing download…
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          Download your file
-                        </span>
+                    <div className="space-y-2">
+                      <Button
+                        size="lg"
+                        className="w-full h-14 text-base font-bold rounded-xl"
+                        disabled={reissuing}
+                        onClick={
+                          state === 'success' && freshDownloadUrl
+                            ? () => triggerBlobDownload(freshDownloadUrl, freshDownloadFileName).catch(console.error)
+                            : handleReissueDownload
+                        }
+                      >
+                        {reissuing ? (
+                          <span className="flex items-center gap-2">
+                            <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                            Preparing download…
+                          </span>
+                        ) : downloadTriggered ? (
+                          <span className="flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4" />
+                            Downloaded
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            Download your file
+                          </span>
+                        )}
+                      </Button>
+                      {downloadTriggered && (
+                        <p className="text-center text-xs text-muted-foreground">
+                          Didn&apos;t download? Click above to retry.
+                        </p>
                       )}
-                    </Button>
-                  )}
-
-                  {/* Inline download link after fresh purchase (one-time token) */}
-                  {state === 'success' && claimUrl && (
-                    <a
-                      href={claimUrl}
-                      className="w-full flex items-center justify-center gap-2 text-sm font-medium text-primary hover:underline"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        fetch(claimUrl)
-                          .then((r) => r.json())
-                          .then(({ downloadUrl, fileName }: { downloadUrl?: string; fileName?: string }) => {
-                            if (!downloadUrl) return
-                            triggerBlobDownload(downloadUrl, fileName ?? 'download').catch(console.error)
-                          })
-                          .catch(console.error)
-                      }}
-                    >
-                      <FileText className="w-4 h-4" />
-                      Download your file
-                    </a>
+                    </div>
                   )}
 
                   {/* Wallet button — always visible when authenticated */}
