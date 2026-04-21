@@ -2,7 +2,30 @@ import { NextRequest, NextResponse } from 'next/server'
 import { privyClient } from '@/lib/privy'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, ilike } from 'drizzle-orm'
+
+/** Derive a base username from display name or email, then ensure uniqueness */
+async function generateUsername(displayName: string | null, email: string | null): Promise<string> {
+  const base = displayName
+    ? displayName.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '')
+    : email
+      ? email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '')
+      : 'user'
+
+  const slug = base || 'user'
+
+  // Check for existing usernames with this base
+  const existing = await db
+    .select({ username: users.username })
+    .from(users)
+    .where(ilike(users.username, `${slug}%`))
+
+  if (!existing.some((u) => u.username === slug)) return slug
+
+  // Append a short random suffix to make it unique
+  const suffix = Math.random().toString(36).slice(2, 6)
+  return `${slug}${suffix}`
+}
 
 /**
  * POST /api/auth/sync
@@ -55,13 +78,19 @@ export async function POST(request: NextRequest) {
       .limit(1)
 
     if (existing) {
-      // Update starknet address and last login
+      // Backfill username if it was never set
+      const username = existing.username ?? await generateUsername(
+        displayName || existing.displayName,
+        email || existing.email,
+      )
+
       const [updated] = await db
         .update(users)
         .set({
           starknetAddress: starknetAddress || existing.starknetAddress,
           email: email || existing.email,
           displayName: displayName || existing.displayName,
+          username,
           updatedAt: new Date(),
         })
         .where(eq(users.id, existing.id))
@@ -70,7 +99,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ user: updated })
     }
 
-    // Create new user
+    // Create new user — always generate a username on first sign-up
+    const username = await generateUsername(displayName, email)
+
     const [newUser] = await db
       .insert(users)
       .values({
@@ -78,6 +109,7 @@ export async function POST(request: NextRequest) {
         starknetAddress: starknetAddress || null,
         email,
         displayName,
+        username,
         isCreator: true,
       })
       .returning()

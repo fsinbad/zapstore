@@ -69,6 +69,7 @@ export const productKeys = {
   list: (filters: Record<string, unknown>) => ['products', 'list', filters] as const,
   detail: (slug: string) => ['products', 'detail', slug] as const,
   store: (username: string) => ['products', 'store', username] as const,
+  purchaseStatus: (slug: string) => ['products', 'purchaseStatus', slug] as const,
 }
 
 // ─── Hooks ───────────────────────────────────────────────
@@ -111,6 +112,18 @@ export function useStoreProducts(username: string) {
         `/api/store/${username}`
       ),
     enabled: !!username,
+  })
+}
+
+export function useProductPurchaseStatus(slug: string, enabled: boolean) {
+  return useQuery({
+    queryKey: productKeys.purchaseStatus(slug),
+    queryFn: () =>
+      api.get<{ purchased: boolean; orderId: string | null }>(
+        `/api/products/${slug}/purchase-status`
+      ),
+    enabled: !!slug && enabled,
+    staleTime: 30_000,
   })
 }
 

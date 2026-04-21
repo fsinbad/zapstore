@@ -116,7 +116,7 @@ export default function OnboardingPage() {
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Username</Label>
                   <div className="flex gap-2">
-                    <Badge variant="outline" className="h-12 px-3 rounded-xl font-mono">zapstore.xyz/store/</Badge>
+                    <Badge variant="outline" className="h-12 px-3 rounded-xl font-mono">zapstore-one.vercel.app/store/</Badge>
                     <Input placeholder="devpro" value={username} onChange={(e) => setUsername(e.target.value)} className="h-12 rounded-xl flex-1" />
                   </div>
                 </div>

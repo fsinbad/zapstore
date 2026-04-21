@@ -20,6 +20,7 @@ interface UpdateProfileInput {
   username?: string
   bio?: string
   avatarUrl?: string
+  email?: string
 }
 
 // ─── Query Keys ──────────────────────────────────────────

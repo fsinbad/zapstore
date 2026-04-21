@@ -27,7 +27,7 @@ export interface ProductCardData {
   price: number
   category: ProductCategory
   coverImageUrl: string | null
-  creator: Pick<Creator, 'username' | 'avatar' | 'avatarUrl'>
+  creator: Pick<Creator, 'username' | 'displayName' | 'avatar' | 'avatarUrl'>
 }
 
 export interface Product extends ProductCardData {

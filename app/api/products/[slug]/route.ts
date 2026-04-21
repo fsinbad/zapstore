@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { products, users } from '@/lib/db/schema'
-import { eq, and, or } from 'drizzle-orm'
+import { eq, and, or, sql } from 'drizzle-orm'
 import { requireCreator } from '@/lib/auth'
 
 // GET /api/products/[slug] — Get single product by slug
@@ -11,6 +11,13 @@ export async function GET(
 ) {
   try {
     const { slug } = await params
+
+    // Only match by id if the slug looks like a UUID — passing a non-UUID
+    // string to eq(products.id, ...) causes Postgres to throw a cast error
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
+    const whereClause = isUUID
+      ? or(eq(products.slug, slug), eq(products.id, slug))
+      : eq(products.slug, slug)
 
     const [row] = await db
       .select({
@@ -31,6 +38,7 @@ export async function GET(
         salesCount: products.salesCount,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
+        creatorId: products.creatorId,
         creator: {
           username: users.username,
           displayName: users.displayName,
@@ -40,7 +48,7 @@ export async function GET(
       })
       .from(products)
       .innerJoin(users, eq(products.creatorId, users.id))
-      .where(or(eq(products.slug, slug), eq(products.id, slug)))
+      .where(whereClause)
       .limit(1)
 
     if (!row) {
@@ -51,7 +59,21 @@ export async function GET(
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ product: row })
+    // Fetch creator's published product count
+    const [{ productCount }] = await db
+      .select({ productCount: sql<number>`count(*)::int` })
+      .from(products)
+      .where(and(eq(products.creatorId, row.creatorId), eq(products.status, 'published')))
+
+    return NextResponse.json({
+      product: {
+        ...row,
+        creator: {
+          ...row.creator,
+          productCount,
+        },
+      },
+    })
   } catch (error) {
     console.error('GET /api/products/[slug] error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

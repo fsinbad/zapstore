@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
-import { OnboardStrategy, getPresets } from 'starkzap'
+import { OnboardStrategy, getPresets, AvnuSwapProvider } from 'starkzap'
 import { sdk } from '@/lib/starkzap'
 import { useWalletStore } from '@/store/walletStore'
 import { useAuthStore } from '@/store/authStore'
@@ -13,10 +13,12 @@ export function useWallet() {
     wallet,
     isConnecting,
     balance,
+    strkBalance,
     error,
     setWallet,
     setConnecting,
     setBalance,
+    setStrkBalance,
     setError,
     reset,
   } = useWalletStore()
@@ -74,11 +76,12 @@ export function useWallet() {
               // We relay to our server with the user's auth token so the endpoint
               // can verify identity before signing.
               rawSign: async (wId: string, hash: string) => {
+                const freshToken = await getAccessToken()
                 const signRes = await fetch('/api/auth/sign', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${accessToken}`,
+                    Authorization: `Bearer ${freshToken}`,
                   },
                   body: JSON.stringify({ walletId: wId, hash }),
                 })
@@ -89,10 +92,39 @@ export function useWallet() {
             }
           },
         },
-        accountPreset: 'argentXV050',
-        feeMode: 'user_pays',  // user pays gas in STRK; switch to sponsored once AVNU key is set
-        deploy: 'if_needed',
+        // OpenZeppelin is used instead of argentXV050.
+        // ArgentX v0.5.0 (0x073414441...) was compiled before Starknet 0.13.5 added
+        // l1_data_gas to V3 resource bounds. Sepolia now runs 0.14.1+, causing
+        // __validate__ to misparse fee fields and panic "Out of gas" on every invoke.
+        // OpenZeppelin is fully compatible with the current V3 transaction spec.
+        accountPreset: 'openzeppelin',
+        feeMode: 'sponsored',
+        deploy: 'never',  // never auto-deploy — deployIfNeeded() handles this before each tx
       })
+
+      // Patch starknet.js v9 Account.resolveDetailsWithTip to force tip=0.
+      // This only affects the execute path (wallet.transfer / invoke).
+      //
+      // tip=0: starknet.js v9 auto-fetches a "recommendedTip" from the RPC and
+      // injects it. Some account contracts panic when tip != 0 but paymaster_data=[].
+      //
+      // l1_gas non-zero: older account contracts can misparse resource_bounds when
+      // any field is exactly 0x0, so we floor l1_gas to a safe minimum.
+      const account = starkWallet.getAccount() as unknown as Record<string, unknown>
+      if (account && typeof account.resolveDetailsWithTip === 'function') {
+        const origResolve = (account.resolveDetailsWithTip as (...a: unknown[]) => Promise<Record<string, unknown>>).bind(account)
+        account.resolveDetailsWithTip = async (details: Record<string, unknown>) => {
+          const resolved = await origResolve(details)
+          const rb = resolved.resourceBounds as Record<string, Record<string, unknown>> | undefined
+          if (rb?.l1_gas && (rb.l1_gas.max_amount === '0x0' || rb.l1_gas.max_amount === BigInt(0) || rb.l1_gas.max_amount === 0)) {
+            rb.l1_gas = { ...rb.l1_gas, max_amount: '0x1000' }
+          }
+          return { ...resolved, tip: BigInt(0), resourceBounds: rb ?? resolved.resourceBounds }
+        }
+      }
+
+      // Register AVNU as the default swap provider so wallet.swap() / wallet.getQuote() work
+      starkWallet.registerSwapProvider(new AvnuSwapProvider(), true)
 
       setWallet(starkWallet)
 
@@ -131,25 +163,39 @@ export function useWallet() {
     await privyLogout()
   }, [reset, authLogout, privyLogout])
 
-  // Refresh USDC balance
+  // Refresh USDC and STRK balances
   const refreshBalance = useCallback(async () => {
     if (!wallet) return null
     try {
       const presets = getPresets(wallet.getChainId())
-      const usdc = presets.USDC
-      const bal = await wallet.balanceOf(usdc)
-      setBalance(bal.toUnit())
-      return bal
+      const [usdcBal, strkBal] = await Promise.all([
+        wallet.balanceOf(presets.USDC),
+        wallet.balanceOf(presets.STRK),
+      ])
+      setBalance(usdcBal.toUnit())
+      setStrkBalance(strkBal.toUnit())
+      return usdcBal
     } catch (err) {
       console.error('Balance check failed:', err)
       return null
     }
-  }, [wallet, setBalance])
+  }, [wallet, setBalance, setStrkBalance])
+
+  /**
+   * Deploy the embedded account on-chain if it hasn't been deployed yet.
+   * Uses AVNU sponsored mode — free on Sepolia, no gas from the buyer.
+   * Safe to call multiple times — idempotent.
+   */
+  const deployIfNeeded = useCallback(async () => {
+    if (!wallet) throw new Error('Wallet not connected')
+    await wallet.ensureReady({ deploy: 'if_needed', feeMode: 'sponsored' })
+  }, [wallet])
 
   return {
     wallet,
     isConnecting,
     balance,
+    strkBalance,
     error,
     isAuthenticated: authenticated,
     privyUser,
@@ -157,5 +203,6 @@ export function useWallet() {
     logout,
     connectWallet,
     refreshBalance,
+    deployIfNeeded,
   }
 }

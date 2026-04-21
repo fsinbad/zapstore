@@ -9,6 +9,9 @@ import { privyClient, privyNodeClient } from '@/lib/privy'
  *
  * Body: { walletId: string, hash: string }
  * Response: { signature: string }  — hex-encoded Stark signature
+ *
+ * Wallets are app-managed (created without owner.user_id) so the server
+ * can sign without requiring user authorization tokens.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -28,11 +31,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Sign the hash using Privy's rawSign — Starknet curve signing.
-    // authorization_context.user_jwts allows Privy to exchange the user's JWT
-    // for a signing key, which authorizes server-side signing on their behalf.
+    // No authorization_context needed: wallets are app-managed so the
+    // server's app credentials are sufficient to authorize signing.
     const result = await privyNodeClient.wallets().rawSign(walletId, {
       params: { hash },
-      authorization_context: { user_jwts: [accessToken] },
     })
 
     return NextResponse.json({ signature: result.signature })

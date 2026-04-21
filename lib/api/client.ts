@@ -24,11 +24,24 @@ export function setAccessTokenProvider(fn: () => Promise<string | null>) {
   getAccessTokenFn = fn
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Fetch the auth header, retrying if the token is not yet available.
+ * Handles two race conditions:
+ *   1. setAccessTokenProvider hasn't been called yet (Privy still initialising)
+ *   2. getAccessToken() returns null on the first render before Privy hydrates
+ * Retries up to 3 times with 300ms between attempts before giving up.
+ */
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  if (!getAccessTokenFn) return {}
-  const token = await getAccessTokenFn()
-  if (!token) return {}
-  return { Authorization: `Bearer ${token}` }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (getAccessTokenFn) {
+      const token = await getAccessTokenFn()
+      if (token) return { Authorization: `Bearer ${token}` }
+    }
+    if (attempt < 2) await sleep(300)
+  }
+  return {}
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | undefined>): string {
@@ -41,12 +54,27 @@ function buildUrl(path: string, params?: Record<string, string | number | undefi
   return url.toString()
 }
 
+async function doFetch(url: string, options: RequestInit): Promise<Response> {
+  const res = await fetch(url, options)
+
+  // On 401, refresh the token once and retry
+  if (res.status === 401) {
+    const freshHeaders = await getAuthHeaders()
+    return fetch(url, {
+      ...options,
+      headers: { ...options.headers, ...freshHeaders },
+    })
+  }
+
+  return res
+}
+
 async function request<T>(path: string, options: FetchOptions = {}): Promise<T> {
   const { params, ...fetchOptions } = options
   const authHeaders = await getAuthHeaders()
   const url = buildUrl(path, params)
 
-  const res = await fetch(url, {
+  const res = await doFetch(url, {
     ...fetchOptions,
     headers: {
       'Content-Type': 'application/json',
@@ -67,7 +95,7 @@ async function request<T>(path: string, options: FetchOptions = {}): Promise<T> 
 async function upload<T>(path: string, formData: FormData): Promise<T> {
   const authHeaders = await getAuthHeaders()
 
-  const res = await fetch(path, {
+  const res = await doFetch(path, {
     method: 'POST',
     headers: authHeaders,
     body: formData,

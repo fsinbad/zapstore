@@ -15,26 +15,28 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   return (
     <Link href={ROUTES.PRODUCT(product.slug)}>
-      <Card className="group border-border/50 bg-card hover:shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden h-full">
+      <Card className="group border-border/40 bg-card card-glow overflow-hidden h-full relative">
+        {/* Gradient border glow on hover */}
+        <div className="absolute inset-0 rounded-[inherit] opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" style={{ background: 'linear-gradient(135deg, rgba(92,92,255,0.08), rgba(123,63,228,0.08), rgba(24,208,181,0.05))', borderRadius: 'inherit' }} />
         {/* Cover Image */}
         <div className="aspect-video bg-muted/30 relative overflow-hidden">
           {product.coverImageUrl ? (
             <img
               src={product.coverImageUrl}
               alt={product.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
             />
           ) : (
             <>
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-secondary/10 to-zap-cyan/10" />
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-secondary/15 to-zap-cyan/20" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <Sparkles className="w-8 h-8 text-muted-foreground/30" />
+                <Sparkles className="w-8 h-8 text-primary/40" />
               </div>
             </>
           )}
-          <div className="absolute inset-0 bg-primary/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Button variant="secondary" size="sm" className="font-bold">
-              View Product
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4">
+            <Button variant="secondary" size="sm" className="font-bold text-xs rounded-full px-4 bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20">
+              View Product →
             </Button>
           </div>
         </div>
@@ -48,7 +50,7 @@ export function ProductCard({ product }: ProductCardProps) {
               </AvatarFallback>
             </Avatar>
             <span className="text-xs text-muted-foreground">
-              {product.creator.username}
+              {product.creator.displayName.split(' ')[0]}
             </span>
           </div>
           <h3 className="font-heading font-bold text-sm leading-tight line-clamp-2">
@@ -58,10 +60,10 @@ export function ProductCard({ product }: ProductCardProps) {
             {product.shortDescription}
           </p>
           <div className="flex items-center justify-between pt-1">
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-[10px] border-primary/20 text-primary/80 bg-primary/5">
               {product.category}
             </Badge>
-            <PriceDisplay amount={product.price} className="font-bold text-sm tabular-nums" />
+            <PriceDisplay amount={product.price} className="font-bold text-sm tabular-nums text-foreground" />
           </div>
         </CardContent>
       </Card>

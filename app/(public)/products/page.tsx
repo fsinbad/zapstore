@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -31,22 +31,33 @@ function mapToCardData(p: {
     category: (p.category ?? 'Other') as ProductCardData['category'],
     coverImageUrl: p.coverImageUrl ?? null,
     creator: {
-      username: p.creator.username ?? 'anonymous',
+      username: p.creator.username ?? '',
+      displayName: p.creator.displayName ?? p.creator.username ?? 'Anonymous',
       avatar: p.creator.displayName?.charAt(0).toUpperCase() ?? '?',
       avatarUrl: p.creator.avatarUrl,
     },
   }
 }
 
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(timer)
+  }, [value, delay])
+  return debounced
+}
+
 export default function ProductsPage() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState('newest')
+  const debouncedQuery = useDebounce(searchQuery, 300)
 
   const { data, isLoading } = useProducts({
     category: activeCategory !== 'All' ? activeCategory : undefined,
     sort: sortBy,
-    q: searchQuery || undefined,
+    q: debouncedQuery || undefined,
     limit: 12,
   })
 
@@ -72,7 +83,7 @@ export default function ProductsPage() {
               placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 border-border/50 focus:border-primary/50"
             />
           </div>
           <Select value={sortBy} onValueChange={setSortBy}>
@@ -98,14 +109,23 @@ export default function ProductsPage() {
               className={cn(
                 "px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all",
                 activeCategory === cat
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-gradient-to-r from-primary to-secondary text-white shadow-[0_0_15px_rgba(92,92,255,0.3)]"
+                  : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40 hover:border-primary/20"
               )}
             >
               {cat}
             </button>
           ))}
         </div>
+
+        {/* Result count */}
+        {!isLoading && (debouncedQuery || activeCategory !== 'All') && (
+          <p className="text-xs text-muted-foreground mb-4">
+            {products.length} product{products.length !== 1 ? 's' : ''}
+            {debouncedQuery ? ` for "${debouncedQuery}"` : ''}
+            {activeCategory !== 'All' ? ` in ${activeCategory}` : ''}
+          </p>
+        )}
 
         {/* Product Grid */}
         {isLoading ? (
@@ -120,16 +140,16 @@ export default function ProductsPage() {
 
             {products.length === 0 && (
               <div className="text-center py-20 text-muted-foreground">
-                <Search className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                <Search className="w-12 h-12 mx-auto mb-4 opacity-20" />
                 <p className="text-lg font-medium">No products found</p>
-                <p className="text-sm mt-1">Try adjusting your search or category filter</p>
+                <p className="text-sm mt-1 opacity-70">Try adjusting your search or category filter</p>
               </div>
             )}
 
             {/* Load More */}
             {products.length > 0 && (
               <div className="flex justify-center mt-12">
-                <Button variant="outline" size="lg" className="rounded-full px-8">
+                <Button variant="outline" size="lg" className="rounded-full px-8 border-border/50 hover:border-primary/30">
                   Load More
                 </Button>
               </div>

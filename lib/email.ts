@@ -6,7 +6,7 @@ function getResend() {
   return _resend
 }
 const FROM = process.env.EMAIL_FROM || 'ZapStore <onboarding@resend.dev>'
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://zapstore.xyz'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://zapstore-one.vercel.app'
 
 interface PurchaseEmailData {
   buyerEmail: string
@@ -76,7 +76,7 @@ function purchaseBuyerHtml(d: PurchaseEmailData) {
     </div>
 
     <p style="color:#444;font-size:12px;text-align:center;margin:0">
-      Questions? Reply to this email or visit <a href="${APP_URL}" style="color:#5C5CFF;text-decoration:none">zapstore.xyz</a>
+      Questions? Reply to this email or visit <a href="${APP_URL}" style="color:#5C5CFF;text-decoration:none">zapstore-one.vercel.app</a>
     </p>
   </div>
 </body>
@@ -139,7 +139,7 @@ function saleCreatorHtml(d: SaleEmailData) {
     </div>
 
     <p style="color:#444;font-size:12px;text-align:center;margin:0">
-      Manage your store at <a href="${APP_URL}/dashboard" style="color:#5C5CFF;text-decoration:none">zapstore.xyz/dashboard</a>
+      Manage your store at <a href="${APP_URL}/dashboard" style="color:#5C5CFF;text-decoration:none">zapstore-one.vercel.app/dashboard</a>
     </p>
   </div>
 </body>
